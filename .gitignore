@@ -29,3 +29,26 @@ data/weights/
 checkpoints/
 outputs/
 *.log
+
+# ------------------------------------------------------------------
+# Training data (large files) – do NOT upload to GitHub
+# ------------------------------------------------------------------
+datasets/*.fasta
+datasets/*.fa
+datasets/*.txt
+datasets/*.csv
+datasets/*.tsv
+datasets/*.json
+datasets/*.yaml
+datasets/*.yml
+datasets/*.npy
+datasets/*.npz
+datasets/*.h5
+datasets/*.hdf5
+datasets/*.pt
+datasets/*.pth
+datasets/*.ckpt
+datasets/*.bin
+datasets/*.log
+
+interference/III-copper/predictions_output.csv
