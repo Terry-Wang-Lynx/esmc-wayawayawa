@@ -1,4 +1,4 @@
-# Python
+】# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -19,36 +19,48 @@ __pycache__/
 env/
 venv/
 
+# ------------------------------------------------------------------
 # Model Weights and Large Files
+# ------------------------------------------------------------------
+# 模型权重（任何路径下的 pth/pt/ckpt/bin 都不上传）
 *.pth
 *.pt
 *.ckpt
 *.bin
+
+# 常见输出、权重目录
 weights/
 data/weights/
 checkpoints/
 outputs/
+
+# 日志文件
 *.log
 
 # ------------------------------------------------------------------
-# Training data (large files) – do NOT upload to GitHub
+# 全局忽略的“数据类文件”格式（不论在哪个目录）
 # ------------------------------------------------------------------
-datasets/*.fasta
-datasets/*.fa
-datasets/*.txt
-datasets/*.csv
-datasets/*.tsv
-datasets/*.json
-datasets/*.yaml
-datasets/*.yml
-datasets/*.npy
-datasets/*.npz
-datasets/*.h5
-datasets/*.hdf5
-datasets/*.pt
-datasets/*.pth
-datasets/*.ckpt
-datasets/*.bin
-datasets/*.log
+# 所有 fasta / fa / csv / tsv 文件都不上传
+*.fasta
+*.fa
+*.csv
+*.tsv
 
+# 如果你也希望其他文本数据不上传，可以取消注释下面几行：
+*.txt
+*.json
+*.yaml
+*.yml
+*.npy
+*.npz
+*.h5
+*.hdf5
+
+# ------------------------------------------------------------------
+# Training data (large files) – do NOT upload to GitHub
+# 整个 datasets 目录及其所有子目录、所有文件都不上传
+# ------------------------------------------------------------------
+datasets/**
+
+# 单独忽略某个预测输出文件
 interference/III-copper/predictions_output.csv
