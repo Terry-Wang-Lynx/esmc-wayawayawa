@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Mac
+.DS_Store
+
+# VS Code
+.vscode/
+!/.vscode/settings.json
+!/.vscode/tasks.json
+!/.vscode/launch.json
+!/.vscode/extensions.json
+
+# Environment
+.env
+.venv
+env/
+venv/
+
+# Model Weights and Large Files
+*.pth
+*.pt
+*.ckpt
+*.bin
+weights/
+data/weights/
+checkpoints/
+outputs/
+*.log

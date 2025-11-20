@@ -83,8 +83,18 @@ def ESMC_600M_202412(device: torch.device | str = "cpu", use_flash_attn: bool = 
             tokenizer=get_esmc_model_tokenizers(),
             use_flash_attn=use_flash_attn,
         ).eval()
+    
+    # Use local path directly to avoid HuggingFace download
+    import os
+    from pathlib import Path
+    local_weight_path = Path(__file__).parent / "data" / "weights" / "esmc_600m_2024_12_v0.pth"
+    
+    if not local_weight_path.exists():
+        # Fallback to data_root if local path doesn't exist
+        local_weight_path = data_root("esmc-600") / "data/weights/esmc_600m_2024_12_v0.pth"
+    
     state_dict = torch.load(
-        data_root("esmc-600") / "data/weights/esmc_600m_2024_12_v0.pth",
+        local_weight_path,
         map_location=device,
     )
     model.load_state_dict(state_dict)

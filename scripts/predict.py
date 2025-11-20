@@ -33,7 +33,7 @@ START_INDEX = 0
 # -----------------
 
 def main():
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
     print(f"[Predict] Using device: {device}")
 
     # 1. 加载模型结构和 Tokenizer
