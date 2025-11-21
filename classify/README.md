@@ -424,4 +424,4 @@ VISUALIZATION_METHOD = "t-SNE"  # 或 "UMAP"
 
 **版本**: 1.0  
 **最后更新**: 2025-11-20  
-**作者**: ESM-C 分类工具开发团队
+**作者**: Terry Wang
