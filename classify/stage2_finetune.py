@@ -128,7 +128,7 @@ def train_stage2():
         history['epoch'].append(epoch + 1)
         
         # Evaluation
-        if (epoch + 1) % config.EVAL_EPOCH_INTERVAL == 0:
+        if (epoch + 1) % config.STAGE2_EVAL_INTERVAL == 0:
             classifier.eval()
             test_correct = 0
             test_total = 0
@@ -183,7 +183,8 @@ def train_stage2():
             utils.save_metrics_to_csv(metrics, csv_path)
             
             # Save training curves (real-time update)
-            utils.save_training_plots(history, config.STAGE2_OUTPUT_DIR)
+            if (epoch + 1) % config.STAGE2_SAVE_PLOTS_INTERVAL == 0:
+                utils.save_training_plots(history, config.STAGE2_OUTPUT_DIR)
             
             # Plot Confusion Matrix
             cm = confusion_matrix(all_labels, all_preds)
@@ -198,7 +199,7 @@ def train_stage2():
             utils.plot_precision_recall_curve(all_labels, all_probs, pr_path)
             
         # Visualization
-        if (epoch + 1) % config.VISUALIZATION_EPOCH_INTERVAL == 0:
+        if (epoch + 1) % config.STAGE2_VISUALIZATION_INTERVAL == 0:
             utils.log_message("Generating visualization...", log_file)
             classifier.eval()
             with torch.no_grad():

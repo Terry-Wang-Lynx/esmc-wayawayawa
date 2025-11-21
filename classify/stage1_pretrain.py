@@ -145,8 +145,9 @@ def train_stage1():
         history['neg_sim'].append(avg_neg_sim)
         history['epoch'].append(epoch + 1)
         
-        # Save plots
-        utils.save_training_plots(history, config.STAGE1_OUTPUT_DIR)
+        # Save plots (every epoch or at specified interval)
+        if (epoch + 1) % config.STAGE1_SAVE_PLOTS_INTERVAL == 0:
+            utils.save_training_plots(history, config.STAGE1_OUTPUT_DIR)
                 
         # Checkpoint
         if (epoch + 1) % config.SAVE_CHECKPOINT_INTERVAL == 0:
@@ -154,7 +155,7 @@ def train_stage1():
             utils.save_checkpoint(classifier, optimizer, epoch, ckpt_path)
             
         # Visualization
-        if (epoch + 1) % config.VISUALIZATION_EPOCH_INTERVAL == 0:
+        if (epoch + 1) % config.STAGE1_VISUALIZATION_INTERVAL == 0:
             utils.log_message("Generating visualization...", log_file)
             classifier.eval()
             with torch.no_grad():

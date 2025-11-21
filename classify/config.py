@@ -64,8 +64,19 @@ FREEZE_BASE_MODEL = True
 UNFREEZE_LAST_N_LAYERS = 0 # 0 means all frozen if FREEZE_BASE_MODEL is True
 
 # --- Visualization & Evaluation ---
-VISUALIZATION_EPOCH_INTERVAL = 10
-EVAL_EPOCH_INTERVAL = 1
+# Stage 1 specific
+STAGE1_VISUALIZATION_INTERVAL = 10  # How often to generate UMAP/t-SNE plots
+STAGE1_SAVE_PLOTS_INTERVAL = 1      # How often to save training curves
+
+# Stage 2 specific
+STAGE2_VISUALIZATION_INTERVAL = 10  # How often to generate UMAP/t-SNE plots
+STAGE2_EVAL_INTERVAL = 1            # How often to evaluate on test set
+STAGE2_SAVE_PLOTS_INTERVAL = 1      # How often to save training curves
+
+# Deprecated (kept for compatibility)
+VISUALIZATION_EPOCH_INTERVAL = STAGE1_VISUALIZATION_INTERVAL
+EVAL_EPOCH_INTERVAL = STAGE2_EVAL_INTERVAL
+
 VISUALIZATION_METHOD = "UMAP" # or "t-SNE"
 
 # --- Device ---
