@@ -12,6 +12,10 @@ from classify import config, data_loader, model, utils
 
 def train_stage1():
     # Setup
+    os.makedirs(config.LOG_DIR, exist_ok=True)
+    os.makedirs(config.CHECKPOINT_DIR, exist_ok=True)
+    os.makedirs(config.VISUALIZATION_DIR, exist_ok=True)
+    
     log_file = os.path.join(config.LOG_DIR, "stage1_log.txt")
     utils.log_message("Starting Stage 1: Contrastive Pretraining", log_file)
     
@@ -34,6 +38,7 @@ def train_stage1():
     
     # Optimizer
     optimizer = optim.AdamW(classifier.parameters(), lr=config.STAGE1_LEARNING_RATE)
+    scaler = torch.cuda.amp.GradScaler()
     
     # Loss
     criterion = nn.CosineEmbeddingLoss(margin=0.5)
@@ -46,6 +51,12 @@ def train_stage1():
     if config.RESUME_FROM_CHECKPOINT:
         start_epoch = utils.load_checkpoint(classifier, optimizer, config.RESUME_FROM_CHECKPOINT)
         
+    # History tracking
+    history = {
+        'train_loss': [],
+        'epoch': []
+    }
+        
     # Training Loop
     for epoch in range(start_epoch, config.STAGE1_EPOCHS):
         classifier.train()
@@ -54,29 +65,18 @@ def train_stage1():
         
         for i, (seq1, seq2, target) in enumerate(dataloader):
             # Tokenize and move to device
-            # We rely on model.encode or similar logic.
-            # Since we don't have a working tokenizer in model.py yet, 
-            # we need to ensure it works.
-            # For now, let's assume model.forward_encoder handles list of strings 
-            # if we implement the tokenization there.
-            
-            # But wait, I didn't implement tokenization in model.py fully.
-            # I need to fix that or this will fail.
-            # Let's assume I'll fix model.py or use a placeholder that works for now.
-            # Actually, I should fix model.py first or handle it here.
-            # But I can't easily fix model.py without knowing the tokenizer API.
-            # I'll assume model.forward_encoder(seq_list) works.
-            
             target = target.to(device)
             
             optimizer.zero_grad()
             
-            emb1 = classifier.forward_encoder(seq1)
-            emb2 = classifier.forward_encoder(seq2)
+            with torch.cuda.amp.autocast():
+                emb1 = classifier.forward_encoder(seq1)
+                emb2 = classifier.forward_encoder(seq2)
+                loss = criterion(emb1, emb2, target)
             
-            loss = criterion(emb1, emb2, target)
-            loss.backward()
-            optimizer.step()
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
             
             total_loss += loss.item()
             steps += 1
@@ -95,6 +95,13 @@ def train_stage1():
             f"Avg Train Loss: {avg_epoch_loss:.4f} ---"
         )
         utils.log_message(f"Epoch {epoch+1} Complete. Avg Loss: {avg_epoch_loss:.4f}", log_file)
+        
+        # Update history
+        history['train_loss'].append(avg_epoch_loss)
+        history['epoch'].append(epoch + 1)
+        
+        # Save plots
+        utils.save_training_plots(history, config.OUTPUT_DIR)
                 
         # Checkpoint
         if (epoch + 1) % config.SAVE_CHECKPOINT_INTERVAL == 0:
@@ -106,21 +113,29 @@ def train_stage1():
             utils.log_message("Generating visualization...", log_file)
             classifier.eval()
             with torch.no_grad():
-                seqs, labels = data_loader.get_all_sequences_for_visualization()
-                # Process in batches to avoid OOM
-                all_embeddings = []
+                # 1. Test Set
+                test_seqs, test_labels = data_loader.get_all_sequences_for_visualization()
+                test_embeddings = []
                 batch_size = config.STAGE1_BATCH_SIZE
-                for j in range(0, len(seqs), batch_size):
-                    batch_seqs = seqs[j:j+batch_size]
+                for j in range(0, len(test_seqs), batch_size):
+                    batch_seqs = test_seqs[j:j+batch_size]
                     batch_emb = classifier.forward_encoder(batch_seqs)
-                    all_embeddings.append(batch_emb.cpu().numpy())
+                    test_embeddings.append(batch_emb.cpu().numpy())
+                test_embeddings = np.concatenate(test_embeddings, axis=0)
                 
-                all_embeddings = np.concatenate(all_embeddings, axis=0)
+                # 2. Train Set (Sampled)
+                train_seqs, train_labels = data_loader.get_train_sequences_for_visualization(sample_size=2000)
+                train_embeddings = []
+                for j in range(0, len(train_seqs), batch_size):
+                    batch_seqs = train_seqs[j:j+batch_size]
+                    batch_emb = classifier.forward_encoder(batch_seqs)
+                    train_embeddings.append(batch_emb.cpu().numpy())
+                train_embeddings = np.concatenate(train_embeddings, axis=0)
                 
                 vis_path = os.path.join(config.VISUALIZATION_DIR, f"stage1_epoch_{epoch+1}.png")
-                utils.reduce_and_plot_embeddings(
-                    all_embeddings, 
-                    labels, 
+                utils.reduce_and_plot_train_test_embeddings(
+                    train_embeddings, train_labels,
+                    test_embeddings, test_labels,
                     vis_path, 
                     method=config.VISUALIZATION_METHOD
                 )

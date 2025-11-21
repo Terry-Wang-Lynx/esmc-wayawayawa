@@ -23,7 +23,7 @@ EMBEDDING_DIM = 1152 # ESM-C 600M has d_model=1152
 
 # --- Stage 1: Contrastive Pretraining ---
 STAGE1_EPOCHS = 20
-STAGE1_BATCH_SIZE = 32 # Default, can be tuned
+STAGE1_BATCH_SIZE = 1 # Reduced to 1 to avoid OOM
 STAGE1_LEARNING_RATE = 1e-4
 LOG_INTERVAL_STEPS = 50
 SAVE_CHECKPOINT_INTERVAL = 5
@@ -31,7 +31,7 @@ RESUME_FROM_CHECKPOINT = None # Path to checkpoint if resuming, e.g., os.path.jo
 
 # --- Stage 2: Classification Finetuning ---
 STAGE2_EPOCHS = 50
-STAGE2_BATCH_SIZE = 32
+STAGE2_BATCH_SIZE = 1
 STAGE2_LEARNING_RATE = 1e-4
 FREEZE_BASE_MODEL = True
 UNFREEZE_LAST_N_LAYERS = 2 # 0 means all frozen if FREEZE_BASE_MODEL is True

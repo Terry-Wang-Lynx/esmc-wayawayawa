@@ -9,7 +9,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from pretrained import load_local_model, ESMC_600M
 
 class ESMCClassifier(nn.Module):
-    def __init__(self, embedding_dim=1280, freeze_base=True, unfreeze_last_n=0):
+    def __init__(self, embedding_dim=1152, freeze_base=True, unfreeze_last_n=0):
         super().__init__()
         # Load ESM-C 600M
         # We assume the weights are available as per pretrained.py logic

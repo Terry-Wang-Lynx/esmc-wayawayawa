@@ -128,3 +128,20 @@ def get_all_sequences_for_visualization():
     sequences = [s[1] for s in test_mono] + [s[1] for s in test_di]
     labels = [0] * len(test_mono) + [1] * len(test_di)
     return sequences, labels
+
+def get_train_sequences_for_visualization(sample_size=2000):
+    """
+    Returns (sequences, labels) for training set visualization (sampled)
+    """
+    train_mono = parse_fasta(os.path.join(config.DATA_ROOT, config.TRAIN_MONO_FILE))
+    train_di = parse_fasta(os.path.join(config.DATA_ROOT, config.TRAIN_DI_FILE))
+    
+    # Sample if too large
+    if len(train_mono) > sample_size // 2:
+        train_mono = random.sample(train_mono, sample_size // 2)
+    if len(train_di) > sample_size // 2:
+        train_di = random.sample(train_di, sample_size // 2)
+        
+    sequences = [s[1] for s in train_mono] + [s[1] for s in train_di]
+    labels = [0] * len(train_mono) + [1] * len(train_di)
+    return sequences, labels
