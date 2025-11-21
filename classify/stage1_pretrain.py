@@ -12,16 +12,16 @@ from classify import config, data_loader, model, utils
 
 def train_stage1():
     # Setup
-    os.makedirs(config.LOG_DIR, exist_ok=True)
-    os.makedirs(config.CHECKPOINT_DIR, exist_ok=True)
-    os.makedirs(config.VISUALIZATION_DIR, exist_ok=True)
-    os.makedirs(config.VISUALIZATION_PLOTS_DIR, exist_ok=True)
-    os.makedirs(config.VISUALIZATION_COORDS_DIR, exist_ok=True)
+    os.makedirs(config.STAGE1_LOG_DIR, exist_ok=True)
+    os.makedirs(config.STAGE1_CHECKPOINT_DIR, exist_ok=True)
+    os.makedirs(config.STAGE1_VISUALIZATION_DIR, exist_ok=True)
+    os.makedirs(config.STAGE1_VISUALIZATION_PLOTS_DIR, exist_ok=True)
+    os.makedirs(config.STAGE1_VISUALIZATION_COORDS_DIR, exist_ok=True)
     
-    log_file = os.path.join(config.LOG_DIR, "stage1_log.txt")
+    log_file = os.path.join(config.STAGE1_LOG_DIR, "stage1_log.txt")
     utils.log_message("Starting Stage 1: Contrastive Pretraining", log_file)
     
-    device = config.DEVICE
+    device = config.STAGE1_DEVICE
     utils.log_message(f"Using device: {device}", log_file)
     
     # Model
@@ -130,7 +130,7 @@ def train_stage1():
         )
         
         # Save metrics to CSV
-        csv_path = os.path.join(config.LOG_DIR, "stage1_metrics.csv")
+        csv_path = os.path.join(config.STAGE1_LOG_DIR, "stage1_metrics.csv")
         metrics = {
             'epoch': epoch + 1,
             'loss': avg_epoch_loss,
@@ -146,11 +146,11 @@ def train_stage1():
         history['epoch'].append(epoch + 1)
         
         # Save plots
-        utils.save_training_plots(history, config.OUTPUT_DIR)
+        utils.save_training_plots(history, config.STAGE1_OUTPUT_DIR)
                 
         # Checkpoint
         if (epoch + 1) % config.SAVE_CHECKPOINT_INTERVAL == 0:
-            ckpt_path = os.path.join(config.CHECKPOINT_DIR, f"stage1_epoch_{epoch+1}.pth")
+            ckpt_path = os.path.join(config.STAGE1_CHECKPOINT_DIR, f"stage1_epoch_{epoch+1}.pth")
             utils.save_checkpoint(classifier, optimizer, epoch, ckpt_path)
             
         # Visualization
@@ -177,7 +177,7 @@ def train_stage1():
                     train_embeddings.append(batch_emb.cpu().numpy())
                 train_embeddings = np.concatenate(train_embeddings, axis=0)
                 
-                vis_path = os.path.join(config.VISUALIZATION_PLOTS_DIR, f"stage1_epoch_{epoch+1}.png")
+                vis_path = os.path.join(config.STAGE1_VISUALIZATION_PLOTS_DIR, f"stage1_epoch_{epoch+1}.png")
                 utils.reduce_and_plot_train_test_embeddings(
                     train_embeddings, train_labels,
                     test_embeddings, test_labels,
@@ -188,7 +188,7 @@ def train_stage1():
                 )
     
     # Save final model
-    final_path = os.path.join(config.CHECKPOINT_DIR, "stage1_final.pth")
+    final_path = os.path.join(config.STAGE1_CHECKPOINT_DIR, "stage1_final.pth")
     utils.save_checkpoint(classifier, optimizer, config.STAGE1_EPOCHS, final_path)
     utils.log_message("Stage 1 training complete.", log_file)
 

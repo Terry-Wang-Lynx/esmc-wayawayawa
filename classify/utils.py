@@ -173,6 +173,36 @@ def save_training_plots(history, output_dir):
         plt.grid(True)
         plt.savefig(os.path.join(output_dir, 'contrastive_metrics.png'))
         plt.close()
+    
+    # Plot Test Accuracy if available
+    if 'test_acc' in history and len(history['test_acc']) > 0:
+        plt.figure()
+        test_epochs = [history['epoch'][i] for i in range(len(history['test_acc']))]
+        plt.plot(test_epochs, history['test_acc'], label='Test Acc', marker='o')
+        if 'train_acc' in history:
+            plt.plot(epochs, history['train_acc'], label='Train Acc', alpha=0.7)
+        plt.xlabel('Epoch')
+        plt.ylabel('Accuracy (%)')
+        plt.title('Training and Test Accuracy')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(os.path.join(output_dir, 'accuracy_curves.png'))
+        plt.close()
+    
+    # Plot Classification Metrics (Precision, Recall, F1) if available
+    if 'test_precision' in history and len(history['test_precision']) > 0:
+        plt.figure()
+        test_epochs = [history['epoch'][i] for i in range(len(history['test_precision']))]
+        plt.plot(test_epochs, history['test_precision'], label='Precision', marker='o')
+        plt.plot(test_epochs, history['test_recall'], label='Recall', marker='s')
+        plt.plot(test_epochs, history['test_f1'], label='F1 Score', marker='^')
+        plt.xlabel('Epoch')
+        plt.ylabel('Score')
+        plt.title('Classification Metrics')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(os.path.join(output_dir, 'classification_metrics.png'))
+        plt.close()
 
 def reduce_and_plot_train_test_embeddings(train_emb, train_lbl, test_emb, test_lbl, output_path, method='UMAP', train_ids=None, test_ids=None):
     """
@@ -289,3 +319,69 @@ def reduce_and_plot_train_test_embeddings(train_emb, train_lbl, test_emb, test_l
         
     except Exception as e:
         print(f"Visualization failed: {e}")
+
+def plot_confusion_matrix(cm, classes, output_path, title='Confusion Matrix'):
+    """
+    Plots the confusion matrix using matplotlib.
+    """
+    plt.figure(figsize=(8, 6))
+    plt.imshow(cm, interpolation='nearest', cmap='Blues')
+    plt.title(title)
+    plt.colorbar()
+    
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes)
+    plt.yticks(tick_marks, classes)
+    
+    # Add text annotations
+    thresh = cm.max() / 2.
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            plt.text(j, i, format(cm[i, j], 'd'),
+                    ha="center", va="center",
+                    color="white" if cm[i, j] > thresh else "black")
+    
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
+    plt.tight_layout()
+    plt.savefig(output_path)
+    plt.close()
+
+def plot_roc_curve(y_true, y_scores, output_path):
+    """
+    Plots the ROC curve.
+    """
+    from sklearn.metrics import roc_curve, auc
+    fpr, tpr, _ = roc_curve(y_true, y_scores)
+    roc_auc = auc(fpr, tpr)
+
+    plt.figure()
+    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic')
+    plt.legend(loc="lower right")
+    plt.grid(True)
+    plt.savefig(output_path)
+    plt.close()
+
+def plot_precision_recall_curve(y_true, y_scores, output_path):
+    """
+    Plots the Precision-Recall curve.
+    """
+    from sklearn.metrics import precision_recall_curve, average_precision_score
+    precision, recall, _ = precision_recall_curve(y_true, y_scores)
+    avg_precision = average_precision_score(y_true, y_scores)
+
+    plt.figure()
+    plt.plot(recall, precision, color='blue', lw=2, label=f'PR curve (AP = {avg_precision:.2f})')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+    plt.legend(loc="lower left")
+    plt.grid(True)
+    plt.savefig(output_path)
+    plt.close()
