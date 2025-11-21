@@ -46,6 +46,31 @@ def load_checkpoint(model, optimizer, filepath):
     print(f"Checkpoint loaded from {filepath}")
     return checkpoint['epoch'] + 1
 
+def save_metrics_to_csv(metrics_dict, csv_path):
+    """
+    Saves metrics to a CSV file. Creates the file with headers if it doesn't exist,
+    otherwise appends a new row.
+    
+    Args:
+        metrics_dict: Dictionary with metric names as keys and values as floats/ints
+        csv_path: Path to the CSV file
+    """
+    import csv
+    
+    # Check if file exists
+    file_exists = os.path.exists(csv_path)
+    
+    # Open file in append mode
+    with open(csv_path, 'a', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=metrics_dict.keys())
+        
+        # Write header if file is new
+        if not file_exists:
+            writer.writeheader()
+        
+        # Write metrics row
+        writer.writerow(metrics_dict)
+
 def reduce_and_plot_embeddings(embeddings, labels, output_path, method='UMAP'):
     """
     Reduces embeddings to 2D and plots them.
@@ -135,10 +160,34 @@ def save_training_plots(history, output_dir):
         plt.grid(True)
         plt.savefig(os.path.join(output_dir, 'training_accuracy.png'))
         plt.close()
+        
+    # Plot Contrastive Similarities if available
+    if 'pos_sim' in history and 'neg_sim' in history:
+        plt.figure()
+        plt.plot(epochs, history['pos_sim'], label='Avg Pos Sim', color='green')
+        plt.plot(epochs, history['neg_sim'], label='Avg Neg Sim', color='red')
+        plt.xlabel('Epoch')
+        plt.ylabel('Cosine Similarity')
+        plt.title('Contrastive Learning Metrics')
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(os.path.join(output_dir, 'contrastive_metrics.png'))
+        plt.close()
 
-def reduce_and_plot_train_test_embeddings(train_emb, train_lbl, test_emb, test_lbl, output_path, method='UMAP'):
+def reduce_and_plot_train_test_embeddings(train_emb, train_lbl, test_emb, test_lbl, output_path, method='UMAP', train_ids=None, test_ids=None):
     """
     Plots both train and test embeddings on the same plot.
+    Also saves a CSV file with coordinates and sequence IDs.
+    
+    Args:
+        train_emb: Training embeddings
+        train_lbl: Training labels
+        test_emb: Test embeddings
+        test_lbl: Test labels
+        output_path: Path to save the plot
+        method: Dimensionality reduction method ('UMAP' or 't-SNE')
+        train_ids: Optional list of training sequence IDs
+        test_ids: Optional list of test sequence IDs
     """
     try:
         # Combine for reduction to ensure same space
@@ -158,6 +207,42 @@ def reduce_and_plot_train_test_embeddings(train_emb, train_lbl, test_emb, test_l
         train_2d = all_emb_2d[:n_train]
         test_2d = all_emb_2d[n_train:]
         
+        # Save coordinates to CSV in separate directory
+        # Extract filename from output_path
+        import os
+        plot_filename = os.path.basename(output_path)
+        csv_filename = plot_filename.replace('.png', '_coordinates.csv')
+        
+        # Get the parent directory of the plots directory
+        # output_path is like: .../visualizations/plots/stage1_epoch_10.png
+        # We want coords_dir to be: .../visualizations/coordinates/
+        output_dir = os.path.dirname(output_path)  # .../visualizations/plots
+        parent_dir = os.path.dirname(output_dir)    # .../visualizations
+        coords_dir = os.path.join(parent_dir, 'coordinates')
+        
+        os.makedirs(coords_dir, exist_ok=True)
+        csv_path = os.path.join(coords_dir, csv_filename)
+        
+        import csv
+        with open(csv_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['sequence_id', 'dataset', 'label', 'x', 'y'])
+            
+            # Write train data
+            for i in range(len(train_2d)):
+                seq_id = train_ids[i] if train_ids else f'train_{i}'
+                label_name = 'mono' if train_lbl[i] == 0 else 'di'
+                writer.writerow([seq_id, 'train', label_name, train_2d[i, 0], train_2d[i, 1]])
+            
+            # Write test data
+            for i in range(len(test_2d)):
+                seq_id = test_ids[i] if test_ids else f'test_{i}'
+                label_name = 'mono' if test_lbl[i] == 0 else 'di'
+                writer.writerow([seq_id, 'test', label_name, test_2d[i, 0], test_2d[i, 1]])
+        
+        print(f"Coordinates saved to {csv_path}")
+        
+        # Plot
         plt.figure(figsize=(12, 10))
         
         # Plot Train (lighter, smaller)

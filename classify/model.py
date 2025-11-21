@@ -29,6 +29,15 @@ class ESMCClassifier(nn.Module):
         self.freeze_base = freeze_base
         self.unfreeze_last_n = unfreeze_last_n
         self._setup_freezing()
+        self.unfreeze_layers()
+        
+        # Ensure classifier head is trainable
+        for param in self.classifier.parameters():
+            param.requires_grad = True
+            
+        # Print trainable parameters
+        trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
+        print(f"Trainable parameters: {trainable_params}")
 
     def _setup_freezing(self):
         if self.freeze_base:
@@ -69,7 +78,8 @@ class ESMCClassifier(nn.Module):
             # Find max layer index
             max_layer = -1
             import re
-            layer_pattern = re.compile(r"layers\.(\d+)\.")
+            # Updated regex to match "transformer.blocks.{index}."
+            layer_pattern = re.compile(r"transformer\.blocks\.(\d+)\.")
             
             for name in param_names:
                 match = layer_pattern.search(name)
@@ -78,17 +88,29 @@ class ESMCClassifier(nn.Module):
                     if layer_idx > max_layer:
                         max_layer = layer_idx
             
+            print(f"Max layer index found: {max_layer}")
+            
             if max_layer != -1:
                 target_start = max_layer - self.unfreeze_last_n + 1
+                print(f"Unfreezing layers from index {target_start} to {max_layer}")
+                count = 0
                 for name, param in self.esmc.named_parameters():
                     match = layer_pattern.search(name)
                     if match:
                         layer_idx = int(match.group(1))
                         if layer_idx >= target_start:
                             param.requires_grad = True
+                            count += 1
                             # print(f"Unfrozen {name}")
+                print(f"Total parameters unfrozen: {count}")
             else:
                 print("Warning: Could not detect layer structure to unfreeze specific layers.")
+                # Fallback: Unfreeze everything if structure detection fails? 
+                # Or maybe unfreeze the last few parameters blindly?
+                # Let's print available parameter names to debug
+                print("Available parameter names (first 20):")
+                for n in param_names[:20]:
+                    print(n)
 
     def forward_encoder(self, sequences):
         """
@@ -111,7 +133,13 @@ class ESMCClassifier(nn.Module):
         
         # Mean pooling over sequence length
         # (B, L, D) -> (B, D)
-        return embeddings.mean(dim=1)
+        pooled = embeddings.mean(dim=1)
+        
+        # Safety check: Ensure output requires grad if we are training
+        if self.training and not pooled.requires_grad:
+             pooled.requires_grad_(True)
+             
+        return pooled
 
     def forward(self, tokens):
         embedding = self.forward_encoder(tokens)

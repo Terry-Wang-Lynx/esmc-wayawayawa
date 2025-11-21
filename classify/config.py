@@ -10,6 +10,8 @@ OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 LOG_DIR = os.path.join(OUTPUT_DIR, "logs")
 CHECKPOINT_DIR = os.path.join(OUTPUT_DIR, "checkpoints")
 VISUALIZATION_DIR = os.path.join(OUTPUT_DIR, "visualizations")
+VISUALIZATION_PLOTS_DIR = os.path.join(VISUALIZATION_DIR, "plots")
+VISUALIZATION_COORDS_DIR = os.path.join(VISUALIZATION_DIR, "coordinates")
 
 # --- Data Files ---
 TRAIN_MONO_FILE = "train_mono.fasta"
@@ -22,11 +24,11 @@ ESMC_MODEL_NAME = "esmc_600m" # Adjust based on actual model loading string if n
 EMBEDDING_DIM = 1152 # ESM-C 600M has d_model=1152
 
 # --- Stage 1: Contrastive Pretraining ---
-STAGE1_EPOCHS = 20
-STAGE1_BATCH_SIZE = 1 # Reduced to 1 to avoid OOM
+STAGE1_EPOCHS = 1000
+STAGE1_BATCH_SIZE = 16 
 STAGE1_LEARNING_RATE = 1e-4
 LOG_INTERVAL_STEPS = 50
-SAVE_CHECKPOINT_INTERVAL = 5
+SAVE_CHECKPOINT_INTERVAL = 25
 RESUME_FROM_CHECKPOINT = None # Path to checkpoint if resuming, e.g., os.path.join(CHECKPOINT_DIR, "stage1_epoch_5.pth")
 
 # --- Stage 2: Classification Finetuning ---
