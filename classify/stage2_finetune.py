@@ -31,8 +31,8 @@ def train_stage2():
     ).to(device)
     
     # Load Stage 1 weights if available
-    stage1_weights = os.path.join(config.STAGE1_CHECKPOINT_DIR, "stage1_final.pth")
-    if os.path.exists(stage1_weights):
+    stage1_weights = config.STAGE2_PRETRAINED_WEIGHTS
+    if stage1_weights and os.path.exists(stage1_weights):
         utils.log_message(f"Loading Stage 1 weights from {stage1_weights}", log_file)
         # We only want to load the encoder part, not the optimizer or the whole state if keys mismatch.
         # But wait, Stage 1 saved the whole model state dict.
@@ -220,6 +220,12 @@ def train_stage2():
                     vis_path, 
                     method=config.VISUALIZATION_METHOD
                 )
+        
+        # Save checkpoint at intervals
+        if (epoch + 1) % config.STAGE2_SAVE_CHECKPOINT_INTERVAL == 0:
+            ckpt_path = os.path.join(config.STAGE2_CHECKPOINT_DIR, f"stage2_epoch_{epoch+1}.pth")
+            utils.save_checkpoint(classifier, optimizer, epoch, ckpt_path)
+            utils.log_message(f"Checkpoint saved to {ckpt_path}", log_file)
                 
     # Save final model
     final_path = os.path.join(config.STAGE2_CHECKPOINT_DIR, "stage2_final.pth")
