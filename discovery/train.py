@@ -245,7 +245,7 @@ def save_training_plots(history, output_dir):
 
 # --- 主函数 ---
 def main():
-    device = torch.device("cuda:2" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:3" if torch.cuda.is_available() else "cpu")
     print(f"[Train] Using device: {device}")
 
     # 1. 加载模型和 Tokenizer
