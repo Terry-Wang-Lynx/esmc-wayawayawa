@@ -15,6 +15,11 @@ def log_message(message, log_file):
     full_message = f"[{timestamp}] {message}"
     print(full_message)
     
+    # Ensure the parent directory exists
+    log_dir = os.path.dirname(log_file)
+    if log_dir:
+        os.makedirs(log_dir, exist_ok=True)
+    
     with open(log_file, 'a') as f:
         f.write(full_message + "\n")
 

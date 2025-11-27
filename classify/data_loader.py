@@ -29,20 +29,43 @@ def parse_fasta(fasta_path):
             sequences.append((header, "".join(seq)))
     return sequences
 
+def augment_sequence(sequence):
+    """
+    Applies random mutation to a protein sequence string.
+    """
+    if random.random() > config.AUGMENT_PROB:
+        return sequence
+        
+    seq_list = list(sequence)
+    # Standard Amino Acids
+    amino_acids = "ACDEFGHIKLMNPQRSTVWY"
+    
+    for i in range(len(seq_list)):
+        if random.random() < config.MUTATION_PROB:
+            seq_list[i] = random.choice(amino_acids)
+            
+    return "".join(seq_list)
+
 class ProteinDataset(Dataset):
-    def __init__(self, sequences, labels=None):
+    def __init__(self, sequences, labels=None, augment=False):
         """
         sequences: list of strings (protein sequences)
         labels: list of int (0 or 1), optional
+        augment: bool, whether to apply data augmentation
         """
         self.sequences = sequences
         self.labels = labels
+        self.augment = augment
 
     def __len__(self):
         return len(self.sequences)
 
     def __getitem__(self, idx):
         seq = self.sequences[idx]
+        
+        if self.augment:
+            seq = augment_sequence(seq)
+            
         if self.labels is not None:
             return seq, self.labels[idx]
         return seq
@@ -86,6 +109,9 @@ class ContrastiveDataset(Dataset):
             seq1 = random.choice(self.mono_seqs)
             seq2 = random.choice(self.di_seqs)
             target = -1.0 # Dissimilar
+        
+        # Note: We could also apply augmentation here if we wanted to make contrastive learning harder
+        # But for now let's keep it simple as requested for classification task
             
         return seq1, seq2, torch.tensor(target, dtype=torch.float)
 
@@ -115,7 +141,8 @@ def get_classification_dataloader(batch_size=config.STAGE2_BATCH_SIZE, is_train=
     # Config doesn't specify which is which, let's assume Mono=0, Di=1
     labels = [0] * len(mono_data) + [1] * len(di_data)
     
-    dataset = ProteinDataset(sequences, labels)
+    # Apply augmentation only if training
+    dataset = ProteinDataset(sequences, labels, augment=is_train)
     return DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
 def get_all_sequences_for_visualization():

@@ -21,8 +21,9 @@ class ESMCClassifier(nn.Module):
         # Simple 2-layer MLP
         self.classifier = nn.Sequential(
             nn.Linear(embedding_dim, 512),
+            nn.LayerNorm(512), # Add normalization for stability
             nn.ReLU(),
-            nn.Dropout(0.1),
+            # nn.Dropout(0.1), # Remove dropout to allow overfitting on small data
             nn.Linear(512, 2) # 2 classes
         )
         

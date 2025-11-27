@@ -22,7 +22,7 @@ LOCAL_WEIGHTS_PATH = "/home/wangty/esm/esm/data/weights/esmc_600m_2024_12_v0.pth
 NUM_CLASSES = 2
 
 # ! 加载我们微调过的权重
-MODEL_PATH = os.path.join(PROJECT_ROOT, "weights", "tyrosinase", "esmc_classifier_epoch_925.pth")
+MODEL_PATH = os.path.join(SCRIPT_DIR, "weights", "tyrosinase", "esmc_classifier_epoch_925.pth")
 
 # ! 需要预测的 FASTA 文件
 FASTA_TO_PREDICT = os.path.join(PROJECT_ROOT, "datasets", "uniref50.fasta")
@@ -89,7 +89,7 @@ def main():
     results = []
     class1_results = []
     
-    output_dir = "/home/wangty/esm/esm/interference/III-copper"
+    output_dir = os.path.join(SCRIPT_DIR, "interference", "III-copper")
     os.makedirs(output_dir, exist_ok=True)
 
     output_file = os.path.join(output_dir, "predictions_output.csv")
