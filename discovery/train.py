@@ -42,15 +42,15 @@ TEST_NEGATIVE_FASTA = os.path.join(SCRIPT_DIR, "datasets", "TIM-barrel", "test_n
 # --- 修改：推荐开启动态采样以解决不平衡问题 ---
 USE_DYNAMIC_SAMPLING = True # 设为 True
 
-MODEL_SAVE_PATH = os.path.join(SCRIPT_DIR, "weights", "esmc_classifier.pth")
+MODEL_SAVE_PATH = os.path.join(SCRIPT_DIR, "outputs", "TIM-barrel", "weights", "esmc_classifier.pth")
 
-WEIGHTS_ROOT = os.path.join(SCRIPT_DIR, "weights")
+WEIGHTS_ROOT = os.path.join(SCRIPT_DIR, "outputs", "TIM-barrel", "weights")
 BEST_MODEL_DIR = os.path.join(WEIGHTS_ROOT, "best")
 BEST_MODEL_PATH = os.path.join(BEST_MODEL_DIR, "esmc_classifier_best.pth")
 PARAMETER_DIR = os.path.join(WEIGHTS_ROOT, "parameter")
 
 # outputs 目录：日志和可视化图像
-OUTPUTS_ROOT = os.path.join(SCRIPT_DIR, "outputs")
+OUTPUTS_ROOT = os.path.join(SCRIPT_DIR, "outputs", "TIM-barrel")
 LOG_FILE_PATH = os.path.join(OUTPUTS_ROOT, "training_log.csv")
 PLOT_LOSS_PATH = os.path.join(OUTPUTS_ROOT, "training_loss.png")
 PLOT_ACC_PATH = os.path.join(OUTPUTS_ROOT, "validation_accuracy.png")
