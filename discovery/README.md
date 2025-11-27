@@ -89,20 +89,17 @@ cd esm/esm/discovery
 
 ### 依赖包
 
-确保以下 Python 包已安装：
-
 ```bash
-# 核心依赖
-torch
-numpy
-
-# 可视化依赖
-matplotlib
-scikit-learn
-
-# ESM 相关（已在 esm3 环境中）
-esm
+# 安装所有依赖
+pip install -r requirements.txt
 ```
+
+核心依赖包括：
+- `torch` - PyTorch 深度学习框架
+- `numpy` - 数值计算
+- `matplotlib` - 可视化
+- `scikit-learn` - 机器学习工具
+- `esm` - ESM 蛋白质语言模型（项目已包含）
 
 ## 数据准备
 

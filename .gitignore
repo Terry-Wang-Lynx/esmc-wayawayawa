@@ -47,6 +47,7 @@ outputs/
 *.tsv
 
 # 如果你也希望其他文本数据不上传，可以取消注释下面几行：
+!requirements.txt
 *.txt
 *.json
 *.yaml

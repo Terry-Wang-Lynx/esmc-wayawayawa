@@ -40,10 +40,12 @@ esmc-wayawayawa/
 git clone https://github.com/Terry-Wang-Lynx/esmc-wayawayawa.git
 cd esmc-wayawayawa
 
-# 配置 ESM-C 环境（需要 Python 3.8+）
+# 创建并激活环境
 conda create -n esm3 python=3.10
 conda activate esm3
-pip install torch numpy matplotlib scikit-learn umap-learn
+
+# 安装依赖
+pip install -r requirements.txt
 ```
 
 ### 2. 下载模型权重
