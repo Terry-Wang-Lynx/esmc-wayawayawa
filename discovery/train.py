@@ -24,10 +24,10 @@ MODEL_NAME = "esmc_600m"
 LOCAL_WEIGHTS_PATH = "/home/wangty/esm/esm/data/weights/esmc_600m_2024_12_v0.pth" 
 NUM_CLASSES = 2
 UNFREEZE_LAYERS = 2
-LEARNING_RATE = 1e-5
+LEARNING_RATE = 1e-6
 EPOCHS = 1000
-EVAL_INTERVAL = 25  # 每多少个 epoch 在测试集上评估一次
-PARAMETER_SAVE_INTERVAL = 25  # 每多少个 epoch 保存一次完整模型参数
+EVAL_INTERVAL = 1  # 每多少个 epoch 在测试集上评估一次
+PARAMETER_SAVE_INTERVAL = 5  # 每多少个 epoch 保存一次完整模型参数
 BATCH_SIZE = 16 # 根据显存调整
 
 # --- 训练集路径 ---
