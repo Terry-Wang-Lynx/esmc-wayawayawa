@@ -31,12 +31,13 @@ PARAMETER_SAVE_INTERVAL = 25  # 每多少个 epoch 保存一次完整模型参�
 BATCH_SIZE = 16 # 根据显存调整
 
 # --- 训练集路径 ---
-POSITIVE_FASTA = os.path.join(PROJECT_ROOT, "datasets", "tyrosinase-co-ppo-swiss.fasta")
-NEGATIVE_FASTA = os.path.join(PROJECT_ROOT, "datasets", "tyr_train_negative.fasta")
+# --- 训练集路径 ---
+POSITIVE_FASTA = os.path.join(SCRIPT_DIR, "datasets", "TIM-barrel", "train_positive.fasta")
+NEGATIVE_FASTA = os.path.join(SCRIPT_DIR, "datasets", "TIM-barrel", "train_negative.fasta")
 
 # --- 新增：测试集 (验证集) 路径 ---
-TEST_POSITIVE_FASTA = os.path.join(PROJECT_ROOT, "datasets", "tyr_test_positive.fasta")
-TEST_NEGATIVE_FASTA = os.path.join(PROJECT_ROOT, "datasets", "test_negative.fasta")
+TEST_POSITIVE_FASTA = os.path.join(SCRIPT_DIR, "datasets", "TIM-barrel", "test_positive.fasta")
+TEST_NEGATIVE_FASTA = os.path.join(SCRIPT_DIR, "datasets", "TIM-barrel", "test_negative.fasta")
 
 # --- 修改：推荐开启动态采样以解决不平衡问题 ---
 USE_DYNAMIC_SAMPLING = True # 设为 True
