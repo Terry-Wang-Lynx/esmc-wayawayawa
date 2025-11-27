@@ -44,8 +44,15 @@ cd esmc-wayawayawa
 conda create -n esm3 python=3.10
 conda activate esm3
 
-# 安装依赖
+# 安装 PyTorch (根据 CUDA 版本选择)
+# CUDA 12.1+
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# 安装其他依赖
 pip install -r requirements.txt
+
+# 安装 ESM 包（本项目已包含，以可编辑模式安装）
+pip install -e .
 ```
 
 ### 2. 下载模型权重

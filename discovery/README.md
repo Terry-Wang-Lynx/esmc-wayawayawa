@@ -90,16 +90,25 @@ cd esm/esm/discovery
 ### 依赖包
 
 ```bash
-# 安装所有依赖
+# 1. 安装 PyTorch (根据 CUDA 版本)
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# 2. 安装其他依赖
 pip install -r requirements.txt
+
+# 3. 安装 ESM 包（项目根目录）
+cd /path/to/esmc-wayawayawa
+pip install -e .
 ```
 
 核心依赖包括：
 - `torch` - PyTorch 深度学习框架
-- `numpy` - 数值计算
+- `numpy`, `scipy`, `pandas` - 数值计算和数据处理
 - `matplotlib` - 可视化
-- `scikit-learn` - 机器学习工具
-- `esm` - ESM 蛋白质语言模型（项目已包含）
+- `scikit-learn`, `umap-learn` - 机器学习工具
+- `biopython`, `biotite` - 生物信息学工具
+- `einops`, `tokenizers` - ESM 模型依赖
+- `esm` - ESM 蛋白质语言模型（项目已包含，需以可编辑模式安装）
 
 ## 数据准备
 
