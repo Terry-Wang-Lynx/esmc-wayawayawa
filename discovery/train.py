@@ -3,11 +3,13 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"  # 消除 tokenizers 并行警告
 import sys
 import csv
 import matplotlib
 matplotlib.use("Agg")  # 使用无界面后端，方便在服务器上保存图像
 import matplotlib.pyplot as plt
+import numpy as np
 
 # --- 路径修复 ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -23,37 +25,43 @@ from data_loader import TrainingDataset, TrainCollate # 导入不变
 MODEL_NAME = "esmc_600m"
 LOCAL_WEIGHTS_PATH = "/home/wangty/esm/esm/data/weights/esmc_600m_2024_12_v0.pth" 
 NUM_CLASSES = 2
-UNFREEZE_LAYERS = 2
-LEARNING_RATE = 1e-6
+UNFREEZE_LAYERS = 4
+LEARNING_RATE = 1e-5
 EPOCHS = 1000
-EVAL_INTERVAL = 1  # 每多少个 epoch 在测试集上评估一次
-PARAMETER_SAVE_INTERVAL = 5  # 每多少个 epoch 保存一次完整模型参数
+EVAL_INTERVAL = 10  # 每多少个 epoch 在测试集上评估一次 (与可视化频率保持一致)
+PARAMETER_SAVE_INTERVAL = 25  # 每多少个 epoch 保存一次完整模型参数
+VISUALIZATION_INTERVAL = 10  # 每多少个 epoch 生成一次降维可视化
 BATCH_SIZE = 16 # 根据显存调整
 
 # --- 训练集路径 ---
 # --- 训练集路径 ---
-POSITIVE_FASTA = os.path.join(SCRIPT_DIR, "datasets", "TIM-barrel", "train_positive.fasta")
-NEGATIVE_FASTA = os.path.join(SCRIPT_DIR, "datasets", "TIM-barrel", "train_negative.fasta")
+POSITIVE_FASTA = "/home/wangty/esm/esm/discovery/datasets/l-dopa/train_positive.fasta"
+NEGATIVE_FASTA = "/home/wangty/esm/esm/discovery/datasets/l-dopa/train_negative.fasta"
 
 # --- 新增：测试集 (验证集) 路径 ---
-TEST_POSITIVE_FASTA = os.path.join(SCRIPT_DIR, "datasets", "TIM-barrel", "test_positive.fasta")
-TEST_NEGATIVE_FASTA = os.path.join(SCRIPT_DIR, "datasets", "TIM-barrel", "test_negative.fasta")
+TEST_POSITIVE_FASTA = "/home/wangty/esm/esm/discovery/datasets/l-dopa/test_positive.fasta"
+TEST_NEGATIVE_FASTA = "/home/wangty/esm/esm/discovery/datasets/l-dopa/test_negative.fasta"
 
 # --- 修改：推荐开启动态采样以解决不平衡问题 ---
 USE_DYNAMIC_SAMPLING = True # 设为 True
 
-MODEL_SAVE_PATH = os.path.join(SCRIPT_DIR, "outputs", "TIM-barrel", "weights", "esmc_classifier.pth")
+MODEL_SAVE_PATH = "/home/wangty/esm/esm/discovery/outputs/III-copper/weights/esmc_classifier.pth"
 
-WEIGHTS_ROOT = os.path.join(SCRIPT_DIR, "outputs", "TIM-barrel", "weights")
+WEIGHTS_ROOT = "/home/wangty/esm/esm/discovery/outputs/III-copper/weights"
 BEST_MODEL_DIR = os.path.join(WEIGHTS_ROOT, "best")
 BEST_MODEL_PATH = os.path.join(BEST_MODEL_DIR, "esmc_classifier_best.pth")
 PARAMETER_DIR = os.path.join(WEIGHTS_ROOT, "parameter")
 
 # outputs 目录：日志和可视化图像
-OUTPUTS_ROOT = os.path.join(SCRIPT_DIR, "outputs", "TIM-barrel")
+OUTPUTS_ROOT = "/home/wangty/esm/esm/discovery/outputs/III-copper"
 LOG_FILE_PATH = os.path.join(OUTPUTS_ROOT, "training_log.csv")
 PLOT_LOSS_PATH = os.path.join(OUTPUTS_ROOT, "training_loss.png")
 PLOT_ACC_PATH = os.path.join(OUTPUTS_ROOT, "validation_accuracy.png")
+
+# 可视化配置
+VISUALIZATION_METHOD = 'UMAP'  # 'UMAP' or 't-SNE'
+VISUALIZATION_DIR = os.path.join(OUTPUTS_ROOT, "visualizations")
+
 # -----------------
 
 
@@ -75,7 +83,7 @@ def evaluate_model(model, data_loader, device, criterion=None):
     total_fn = 0
 
     with torch.no_grad():  # 在评估时关闭梯度计算
-        for batch_tokens, batch_labels in data_loader:
+        for batch_tokens, batch_labels, batch_names in data_loader:
             batch_tokens = batch_tokens.to(device)
             batch_labels = batch_labels.to(device)
 
@@ -171,6 +179,152 @@ def update_log_file(log_path, epoch, train_loss, train_accuracy,
         ])
 
 
+
+
+def generate_embedding_visualization(model, train_loader, test_loader, device, output_dir, method='UMAP', epoch=None):
+    """
+    生成训练集和测试集的降维可视化图
+    
+    Args:
+        model: 训练好的模型
+        train_loader: 训练集 DataLoader
+        test_loader: 测试集 DataLoader
+        device: 设备
+        output_dir: 输出目录
+        method: 降维方法 ('UMAP' or 't-SNE')
+        epoch: 当前 epoch 编号（用于文件命名）
+    """
+    print(f"\n[Visualization] Generating embedding visualization using {method}...")
+    
+    model.eval()
+    
+    # 提取训练集 embeddings
+    train_embeddings = []
+    train_labels = []
+    train_names = []
+    with torch.no_grad():
+        for batch_tokens, batch_labels, batch_names in train_loader:
+            batch_tokens = batch_tokens.to(device)
+            if hasattr(model, 'forward_encoder'):
+                emb = model.forward_encoder(batch_tokens)
+            else:
+                raise AttributeError("Model does not have 'forward_encoder' method. Please check model.py.")
+            train_embeddings.append(emb.cpu().numpy())
+            train_labels.extend(batch_labels.cpu().numpy())
+            train_names.extend(batch_names)
+    
+    train_embeddings = np.concatenate(train_embeddings, axis=0)
+    train_labels = np.array(train_labels)
+    
+    # 提取测试集 embeddings
+    test_embeddings = []
+    test_labels = []
+    test_names = []
+    with torch.no_grad():
+        for batch_tokens, batch_labels, batch_names in test_loader:
+            batch_tokens = batch_tokens.to(device)
+            if hasattr(model, 'forward_encoder'):
+                emb = model.forward_encoder(batch_tokens)
+            else:
+                raise AttributeError("Model does not have 'forward_encoder' method. Please check model.py.")
+            test_embeddings.append(emb.cpu().numpy())
+            test_labels.extend(batch_labels.cpu().numpy())
+            test_names.extend(batch_names)
+    
+    test_embeddings = np.concatenate(test_embeddings, axis=0)
+    test_labels = np.array(test_labels)
+    
+    print(f"[Visualization] Train embeddings shape: {train_embeddings.shape}")
+    print(f"[Visualization] Test embeddings shape: {test_embeddings.shape}")
+    
+    # 合并所有数据进行降维（确保在同一空间）
+    all_embeddings = np.concatenate([train_embeddings, test_embeddings], axis=0)
+    
+    # 降维
+    print(f"[Visualization] Performing dimensionality reduction...")
+    try:
+        if method == 'UMAP':
+            try:
+                import umap
+                reducer = umap.UMAP(n_neighbors=15, min_dist=0.1, metric='cosine')
+            except ImportError:
+                print("[Warning] UMAP not installed, falling back to t-SNE")
+                from sklearn.manifold import TSNE
+                reducer = TSNE(n_components=2, metric='cosine', init='pca', learning_rate='auto')
+        else:
+            from sklearn.manifold import TSNE
+            reducer = TSNE(n_components=2, metric='cosine', init='pca', learning_rate='auto')
+        
+        all_embeddings_2d = reducer.fit_transform(all_embeddings)
+    except Exception as e:
+        print(f"[Error] Dimensionality reduction failed: {e}")
+        return
+    
+    # 拆分回训练集和测试集
+    n_train = len(train_embeddings)
+    train_2d = all_embeddings_2d[:n_train]
+    test_2d = all_embeddings_2d[n_train:]
+    
+    # 保存坐标到 CSV
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 根据是否有 epoch 参数决定文件名
+    if epoch is not None:
+        coords_file = os.path.join(output_dir, f"embedding_coordinates_epoch_{epoch}.csv")
+        vis_path = os.path.join(output_dir, f"embedding_visualization_epoch_{epoch}.png")
+    else:
+        coords_file = os.path.join(output_dir, "embedding_coordinates.csv")
+        vis_path = os.path.join(output_dir, "embedding_visualization.png")
+    
+    print(f"[Visualization] Saving coordinates to {coords_file}...")
+    
+    with open(coords_file, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['dataset', 'label', 'label_name', 'name', 'x', 'y'])
+        
+        # 写入训练集数据
+        for i in range(len(train_2d)):
+            label_name = 'positive' if train_labels[i] == 1 else 'negative'
+            writer.writerow(['train', train_labels[i], label_name, train_names[i], train_2d[i, 0], train_2d[i, 1]])
+        
+        # 写入测试集数据
+        for i in range(len(test_2d)):
+            label_name = 'positive' if test_labels[i] == 1 else 'negative'
+            writer.writerow(['test', test_labels[i], label_name, test_names[i], test_2d[i, 0], test_2d[i, 1]])
+    
+    # 绘制可视化图
+    print(f"[Visualization] Generating plot...")
+    
+    plt.figure(figsize=(14, 12))
+    
+    # 绘制训练集（浅色，小点）
+    train_neg_mask = train_labels == 0
+    train_pos_mask = train_labels == 1
+    plt.scatter(train_2d[train_neg_mask, 0], train_2d[train_neg_mask, 1],
+                c='lightblue', label='Train Negative', alpha=0.4, s=20, marker='o', edgecolors='blue', linewidths=0.3)
+    plt.scatter(train_2d[train_pos_mask, 0], train_2d[train_pos_mask, 1],
+                c='lightcoral', label='Train Positive', alpha=0.4, s=20, marker='o', edgecolors='red', linewidths=0.3)
+    
+    # 绘制测试集（深色，大点，不同标记）
+    test_neg_mask = test_labels == 0
+    test_pos_mask = test_labels == 1
+    plt.scatter(test_2d[test_neg_mask, 0], test_2d[test_neg_mask, 1],
+                c='blue', label='Test Negative', alpha=0.8, s=50, marker='X', edgecolors='darkblue', linewidths=0.8)
+    plt.scatter(test_2d[test_pos_mask, 0], test_2d[test_pos_mask, 1],
+                c='red', label='Test Positive', alpha=0.8, s=50, marker='X', edgecolors='darkred', linewidths=0.8)
+    
+    plt.title(f"Protein Embeddings Visualization ({method})\nTrain (Circle) vs Test (Cross)", fontsize=14, fontweight='bold')
+    plt.legend(loc='best', fontsize=10, framealpha=0.9)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(vis_path, dpi=150)
+    plt.close()
+    
+    print(f"[Visualization] Visualization saved to {vis_path}")
+    print(f"[Visualization] Coordinates saved to {coords_file}")
+    model.train()  # 切回训练模式
+
+
 def save_training_plots(history, output_dir):
     """
     根据当前 history 绘制并保存训练曲线图像
@@ -178,17 +332,23 @@ def save_training_plots(history, output_dir):
         'train_loss', 'train_accuracy',
         'val_loss', 'val_accuracy',
         'val_precision', 'val_recall', 'val_f1',
-        'learning_rate'
+        'learning_rate',
+        'val_epochs'  # 实际进行验证的 epoch 列表
     """
     epochs = list(range(1, len(history["train_loss"]) + 1))
     if not epochs:
         return
 
-    # 训练损失曲线
+    # 1. 训练损失曲线
     plt.figure()
     plt.plot(epochs, history["train_loss"], label="Train Loss")
-    if len(history["val_loss"]) == len(epochs):
-        plt.plot(epochs, history["val_loss"], label="Val Loss")
+    # 只绘制实际进行验证的 epoch 的验证损失
+    if "val_epochs" in history and len(history["val_epochs"]) > 0:
+        val_epochs = history["val_epochs"]
+        # 直接根据 val_epochs 索引提取对应的值，不过滤 0 值
+        val_losses = [history["val_loss"][e-1] for e in val_epochs]
+        if len(val_losses) > 0:
+            plt.plot(val_epochs, val_losses, label="Val Loss", marker='o')
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title("Training / Validation Loss")
@@ -198,28 +358,39 @@ def save_training_plots(history, output_dir):
     plt.savefig(os.path.join(output_dir, "training_loss.png"))
     plt.close()
 
-    # 准确率曲线
-    if len(history["train_accuracy"]) == len(epochs) and len(history["val_accuracy"]) == len(epochs):
-        plt.figure()
-        plt.plot(epochs, history["train_accuracy"], label="Train Accuracy")
-        plt.plot(epochs, history["val_accuracy"], label="Val Accuracy")
-        plt.xlabel("Epoch")
-        plt.ylabel("Accuracy")
-        plt.title("Training / Validation Accuracy")
-        plt.grid(True)
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, "validation_accuracy.png"))
-        plt.close()
+    # 2. 准确率曲线
+    plt.figure()
+    plt.plot(epochs, history["train_accuracy"], label="Train Accuracy")
+    # 只绘制实际进行验证的 epoch 的验证准确率
+    if "val_epochs" in history and len(history["val_epochs"]) > 0:
+        val_epochs = history["val_epochs"]
+        val_accs = [history["val_accuracy"][e-1] for e in val_epochs]
+        if len(val_accs) > 0:
+            plt.plot(val_epochs, val_accs, label="Val Accuracy", marker='o')
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.title("Training / Validation Accuracy")
+    plt.grid(True)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "validation_accuracy.png"))
+    plt.close()
 
-    # 验证集 Precision / Recall / F1 曲线
-    if len(history["val_precision"]) == len(epochs):
+    # 3. 验证集 Precision / Recall / F1 曲线
+    if "val_epochs" in history and len(history["val_epochs"]) > 0:
+        val_epochs = history["val_epochs"]
+        val_precisions = [history["val_precision"][e-1] for e in val_epochs]
+        val_recalls = [history["val_recall"][e-1] for e in val_epochs]
+        val_f1s = [history["val_f1"][e-1] for e in val_epochs]
+        
         plt.figure()
-        plt.plot(epochs, history["val_precision"], label="Val Precision")
-        if len(history["val_recall"]) == len(epochs):
-            plt.plot(epochs, history["val_recall"], label="Val Recall")
-        if len(history["val_f1"]) == len(epochs):
-            plt.plot(epochs, history["val_f1"], label="Val F1")
+        if len(val_precisions) > 0:
+            plt.plot(val_epochs, val_precisions, label="Val Precision", marker='o')
+        if len(val_recalls) > 0:
+            plt.plot(val_epochs, val_recalls, label="Val Recall", marker='s')
+        if len(val_f1s) > 0:
+            plt.plot(val_epochs, val_f1s, label="Val F1", marker='^')
+            
         plt.xlabel("Epoch")
         plt.ylabel("Score")
         plt.title("Validation Precision / Recall / F1")
@@ -229,7 +400,7 @@ def save_training_plots(history, output_dir):
         plt.savefig(os.path.join(output_dir, "val_prf1.png"))
         plt.close()
 
-    # 学习率曲线（如果有记录）
+    # 4. 学习率曲线（如果有记录）
     if len(history.get("learning_rate", [])) == len(epochs):
         plt.figure()
         plt.plot(epochs, history["learning_rate"], label="Learning Rate")
@@ -335,8 +506,29 @@ def main():
         "val_recall": [],
         "val_f1": [],
         "learning_rate": [],
-        "best_val_accuracy": []
+        "best_val_accuracy": [],
+        "val_epochs": []  # 记录实际进行验证的 epoch
     }
+
+    # --- 新增：在训练开始前生成 Epoch 0 可视化 ---
+    print("\n" + "="*80)
+    print("[Train] Generating initial (Epoch 0) dimensionality reduction visualization...")
+    print("="*80)
+    try:
+        generate_embedding_visualization(
+            model=model,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            device=device,
+            output_dir=VISUALIZATION_DIR,
+            method=VISUALIZATION_METHOD,
+            epoch=0  # 使用 0 表示初始状态
+        )
+        print("[Train] Initial visualization complete!")
+    except Exception as e:
+        print(f"[Train] Warning: Initial visualization generation failed: {e}")
+        import traceback
+        traceback.print_exc()
 
     for epoch in range(EPOCHS):
         model.train()  # 确保模型处于训练模式
@@ -344,7 +536,7 @@ def main():
         total_correct = 0
         total_samples = 0
 
-        for i, (batch_tokens, batch_labels) in enumerate(train_loader):
+        for i, (batch_tokens, batch_labels, batch_names) in enumerate(train_loader):
             batch_tokens = batch_tokens.to(device)
             batch_labels = batch_labels.to(device)
 
@@ -397,6 +589,9 @@ def main():
 
         # 仅在达到评估间隔或最后一轮时进行验证集评估
         if len(test_loader) > 0 and (((epoch + 1) % EVAL_INTERVAL == 0) or (epoch + 1 == EPOCHS)):
+            # 记录当前 epoch 进行了验证
+            history["val_epochs"].append(epoch + 1)
+            
             val_metrics = evaluate_model(model, test_loader, device, criterion=criterion)
             val_loss = val_metrics["loss"]
             val_accuracy = val_metrics["accuracy"]
@@ -454,6 +649,29 @@ def main():
 
         # 每一轮循环结束后实时更新训练曲线图像
         save_training_plots(history, OUTPUTS_ROOT)
+        
+        # 每 VISUALIZATION_INTERVAL 轮生成一次降维可视化
+        if (epoch + 1) % VISUALIZATION_INTERVAL == 0:
+            print("\n" + "="*80)
+            print(f"[Train] Generating dimensionality reduction visualization at epoch {epoch + 1}...")
+            print("="*80)
+            try:
+                generate_embedding_visualization(
+                    model=model,
+                    train_loader=train_loader,
+                    test_loader=test_loader,
+                    device=device,
+                    output_dir=VISUALIZATION_DIR,
+                    method=VISUALIZATION_METHOD,
+                    epoch=epoch + 1  # 传入 epoch 编号用于文件命名
+                )
+                print(f"[Train] Visualization for epoch {epoch + 1} complete!")
+            except Exception as e:
+                print(f"[Train] Warning: Visualization generation failed: {e}")
+                import traceback
+                traceback.print_exc()
+
+
 
     # 5. 保存最终模型
     # (您也可以选择只保存在验证集上表现最好的模型)
@@ -461,6 +679,8 @@ def main():
     torch.save(model.state_dict(), MODEL_SAVE_PATH)
     print(f"[Train] Model training complete. Final weights saved to {MODEL_SAVE_PATH}")
     print(f"[Train] Best validation accuracy achieved: {best_val_accuracy * 100:.2f}%")
+
+
 
 if __name__ == "__main__":
     main()

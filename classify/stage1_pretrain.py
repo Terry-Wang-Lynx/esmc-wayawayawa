@@ -5,13 +5,13 @@ import os
 import sys
 import numpy as np
 
-# Ensure we can import from root
+# 确保可以从根目录导入
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from classify import config, data_loader, model, utils
 
 def train_stage1():
-    # Setup
+    # 初始化
     os.makedirs(config.STAGE1_LOG_DIR, exist_ok=True)
     os.makedirs(config.STAGE1_CHECKPOINT_DIR, exist_ok=True)
     os.makedirs(config.STAGE1_VISUALIZATION_DIR, exist_ok=True)
@@ -24,8 +24,8 @@ def train_stage1():
     device = config.STAGE1_DEVICE
     utils.log_message(f"Using device: {device}", log_file)
     
-    # Model
-    # For Stage 1, we want to fine-tune the encoder.
+    # 模型
+    # Stage 1 微调编码器
     # So we set freeze_base=False to allow gradients.
     # Or we can use the config setting if it was meant for both. 
     # But config says FREEZE_BASE_MODEL is for Stage 2.
@@ -35,34 +35,86 @@ def train_stage1():
     classifier = model.ESMCClassifier(
         embedding_dim=config.EMBEDDING_DIM,
         freeze_base=True,
-        unfreeze_last_n=2
+        unfreeze_last_n=4
     ).to(device)
     utils.log_message("Model initialized and moved to device.", log_file)
     
-    # Optimizer
+    # 全量微调逻辑
+    if config.STAGE1_FULL_FINETUNE:
+        utils.log_message("STAGE1_FULL_FINETUNE is True. Unfreezing ALL layers for full fine-tuning.", log_file)
+        for param in classifier.parameters():
+            param.requires_grad = True
+    else:
+        utils.log_message(f"STAGE1_FULL_FINETUNE is False. Only unfreezing last {classifier.unfreeze_last_n} layers.", log_file)
+
+    # 优化器
     optimizer = optim.AdamW(classifier.parameters(), lr=config.STAGE1_LEARNING_RATE)
     scaler = torch.cuda.amp.GradScaler()
     
-    # Loss
+    # 损失函数
     criterion = nn.CosineEmbeddingLoss(margin=0.5)
     
-    # Data
+    # 数据
     dataloader = data_loader.get_contrastive_dataloader(batch_size=config.STAGE1_BATCH_SIZE)
     
-    # Resume
+    # 恢复训练
     start_epoch = 0
     if config.RESUME_FROM_CHECKPOINT:
         start_epoch = utils.load_checkpoint(classifier, optimizer, config.RESUME_FROM_CHECKPOINT)
         
-    # History tracking
+    # 历史记录
     history = {
         'train_loss': [],
         'pos_sim': [],
         'neg_sim': [],
         'epoch': []
     }
+
+    # 可视化辅助函数
+    def run_visualization(epoch_num):
+        utils.log_message(f"Generating visualization for Epoch {epoch_num}...", log_file)
+        classifier.eval()
+        try:
+            with torch.no_grad():
+                # 1. 测试集
+                test_seqs, test_labels, test_ids = data_loader.get_all_sequences_for_visualization()
+                test_embeddings = []
+                batch_size = config.STAGE1_BATCH_SIZE
+                for j in range(0, len(test_seqs), batch_size):
+                    batch_seqs = test_seqs[j:j+batch_size]
+                    batch_emb = classifier.forward_encoder(batch_seqs)
+                    test_embeddings.append(batch_emb.cpu().numpy())
+                test_embeddings = np.concatenate(test_embeddings, axis=0)
+                
+                # 2. 训练集 (采样)
+                train_seqs, train_labels, train_ids = data_loader.get_train_sequences_for_visualization(sample_size=2000)
+                train_embeddings = []
+                for j in range(0, len(train_seqs), batch_size):
+                    batch_seqs = train_seqs[j:j+batch_size]
+                    batch_emb = classifier.forward_encoder(batch_seqs)
+                    train_embeddings.append(batch_emb.cpu().numpy())
+                train_embeddings = np.concatenate(train_embeddings, axis=0)
+                
+                vis_path = os.path.join(config.STAGE1_VISUALIZATION_PLOTS_DIR, f"stage1_epoch_{epoch_num}.png")
+                utils.reduce_and_plot_train_test_embeddings(
+                    train_embeddings, train_labels,
+                    test_embeddings, test_labels,
+                    vis_path, 
+                    method=config.VISUALIZATION_METHOD,
+                    train_ids=train_ids,
+                    test_ids=test_ids
+                )
+                utils.log_message(f"Visualization saved to {vis_path}", log_file)
+        except Exception as e:
+            utils.log_message(f"Visualization failed: {e}", log_file)
+            import traceback
+            traceback.print_exc()
+
+    # 初始可视化 (Epoch 0)
+    if start_epoch == 0:
+        run_visualization(0)
         
-    # Training Loop
+    # 训练循环
     for epoch in range(start_epoch, config.STAGE1_EPOCHS):
         classifier.train()
         total_loss = 0
@@ -156,37 +208,7 @@ def train_stage1():
             
         # Visualization
         if (epoch + 1) % config.STAGE1_VISUALIZATION_INTERVAL == 0:
-            utils.log_message("Generating visualization...", log_file)
-            classifier.eval()
-            with torch.no_grad():
-                # 1. Test Set
-                test_seqs, test_labels, test_ids = data_loader.get_all_sequences_for_visualization()
-                test_embeddings = []
-                batch_size = config.STAGE1_BATCH_SIZE
-                for j in range(0, len(test_seqs), batch_size):
-                    batch_seqs = test_seqs[j:j+batch_size]
-                    batch_emb = classifier.forward_encoder(batch_seqs)
-                    test_embeddings.append(batch_emb.cpu().numpy())
-                test_embeddings = np.concatenate(test_embeddings, axis=0)
-                
-                # 2. Train Set (Sampled)
-                train_seqs, train_labels, train_ids = data_loader.get_train_sequences_for_visualization(sample_size=2000)
-                train_embeddings = []
-                for j in range(0, len(train_seqs), batch_size):
-                    batch_seqs = train_seqs[j:j+batch_size]
-                    batch_emb = classifier.forward_encoder(batch_seqs)
-                    train_embeddings.append(batch_emb.cpu().numpy())
-                train_embeddings = np.concatenate(train_embeddings, axis=0)
-                
-                vis_path = os.path.join(config.STAGE1_VISUALIZATION_PLOTS_DIR, f"stage1_epoch_{epoch+1}.png")
-                utils.reduce_and_plot_train_test_embeddings(
-                    train_embeddings, train_labels,
-                    test_embeddings, test_labels,
-                    vis_path, 
-                    method=config.VISUALIZATION_METHOD,
-                    train_ids=train_ids,
-                    test_ids=test_ids
-                )
+            run_visualization(epoch + 1)
     
     # Save final model
     final_path = os.path.join(config.STAGE1_CHECKPOINT_DIR, "stage1_final.pth")

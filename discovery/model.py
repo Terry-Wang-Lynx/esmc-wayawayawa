@@ -76,6 +76,21 @@ class ESMCForSequenceClassification(nn.Module):
         
         return logits
 
+    def forward_encoder(self, sequence_tokens: torch.Tensor, sequence_id: torch.Tensor = None) -> torch.Tensor:
+        """
+        仅提取编码器的输出 (CLS token embedding)，用于可视化或特征提取。
+        """
+        # 1. 通过 ESMC 主干网络
+        outputs: ESMCOutput = self.esmc(sequence_tokens, sequence_id=sequence_id)
+        
+        # 2. 提取 Embeddings
+        embeddings = outputs.embeddings
+        
+        # 3. 提取 CLS Token (位于序列索引 0)
+        cls_embedding = embeddings[:, 0, :]  # Shape: [Batch, Hidden_Dim]
+        
+        return cls_embedding
+
 def get_model_and_tokenizer(
     model_name: str = "esmc_600m",
     num_classes: int = 2,

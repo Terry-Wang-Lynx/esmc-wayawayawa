@@ -143,8 +143,9 @@ class TrainCollate:
         # labels = [ 1, 0, 1, ... ]
         data_tuples, labels = zip(*batch)
 
-        # 2. 提取序列字符串
+        # 2. 提取序列字符串和名字
         sequences = [item[1] for item in data_tuples]
+        names = [item[0] for item in data_tuples]
 
         # 3. 动态 Tokenize + 截断
         token_list = [
@@ -164,7 +165,7 @@ class TrainCollate:
         # 5. 转换标签
         labels_tensor = torch.tensor(labels, dtype=torch.long)
 
-        return padded_tokens, labels_tensor
+        return padded_tokens, labels_tensor, list(names)
 
 
 # --- 5. 预测专用 Collate（返回 name / tokens / 原始序列） ---

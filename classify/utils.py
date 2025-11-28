@@ -15,7 +15,7 @@ def log_message(message, log_file):
     full_message = f"[{timestamp}] {message}"
     print(full_message)
     
-    # Ensure the parent directory exists
+    # 确保父目录存在
     log_dir = os.path.dirname(log_file)
     if log_dir:
         os.makedirs(log_dir, exist_ok=True)
@@ -62,18 +62,18 @@ def save_metrics_to_csv(metrics_dict, csv_path):
     """
     import csv
     
-    # Check if file exists
+    # 检查文件是否存在
     file_exists = os.path.exists(csv_path)
     
-    # Open file in append mode
+    # 以追加模式打开文件
     with open(csv_path, 'a', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=metrics_dict.keys())
         
-        # Write header if file is new
+        # 如果是新文件则写入表头
         if not file_exists:
             writer.writeheader()
         
-        # Write metrics row
+        # 写入指标行
         writer.writerow(metrics_dict)
 
 def reduce_and_plot_embeddings(embeddings, labels, output_path, method='UMAP'):
@@ -94,8 +94,8 @@ def reduce_and_plot_embeddings(embeddings, labels, output_path, method='UMAP'):
         
         plt.figure(figsize=(10, 8))
         
-        # Scatter plot
-        # Assuming binary labels 0 and 1
+        # 散点图
+        # 假设二分类标签 0 和 1
         unique_labels = np.unique(labels)
         colors = ['blue', 'red']
         class_names = ['Mono', 'Di']
@@ -115,12 +115,12 @@ def reduce_and_plot_embeddings(embeddings, labels, output_path, method='UMAP'):
         plt.legend()
         plt.grid(True, alpha=0.3)
         
-        # Save to temporary file first
+        # 先保存到临时文件
         temp_path = output_path + ".tmp.png"
         plt.savefig(temp_path)
         plt.close()
         
-        # Rename to target
+        # 重命名为目标文件
         os.rename(temp_path, output_path)
         print(f"Visualization saved to {output_path}")
         
@@ -138,7 +138,7 @@ def save_training_plots(history, output_dir):
     if not epochs:
         epochs = list(range(1, len(history.get('train_loss', [])) + 1))
         
-    # Plot Loss
+    # 绘制损失曲线
     if 'train_loss' in history:
         plt.figure()
         plt.plot(epochs, history['train_loss'], label='Train Loss')
@@ -152,7 +152,7 @@ def save_training_plots(history, output_dir):
         plt.savefig(os.path.join(output_dir, 'training_loss.png'))
         plt.close()
         
-    # Plot Accuracy if available
+    # 绘制准确率曲线
     if 'train_accuracy' in history:
         plt.figure()
         plt.plot(epochs, history['train_accuracy'], label='Train Acc')
@@ -166,7 +166,7 @@ def save_training_plots(history, output_dir):
         plt.savefig(os.path.join(output_dir, 'training_accuracy.png'))
         plt.close()
         
-    # Plot Contrastive Similarities if available
+    # 绘制对比相似度曲线
     if 'pos_sim' in history and 'neg_sim' in history:
         plt.figure()
         plt.plot(epochs, history['pos_sim'], label='Avg Pos Sim', color='green')
@@ -179,10 +179,14 @@ def save_training_plots(history, output_dir):
         plt.savefig(os.path.join(output_dir, 'contrastive_metrics.png'))
         plt.close()
     
-    # Plot Test Accuracy if available
+    # 绘制测试准确率曲线
     if 'test_acc' in history and len(history['test_acc']) > 0:
         plt.figure()
-        test_epochs = [history['epoch'][i] for i in range(len(history['test_acc']))]
+        # 使用记录的测试周期
+        test_epochs = history.get('test_epoch', [])
+        if not test_epochs or len(test_epochs) != len(history['test_acc']):
+             test_epochs = [history['epoch'][i] for i in range(len(history['test_acc']))]
+             
         plt.plot(test_epochs, history['test_acc'], label='Test Acc', marker='o')
         if 'train_acc' in history:
             plt.plot(epochs, history['train_acc'], label='Train Acc', alpha=0.7)
@@ -194,10 +198,14 @@ def save_training_plots(history, output_dir):
         plt.savefig(os.path.join(output_dir, 'accuracy_curves.png'))
         plt.close()
     
-    # Plot Classification Metrics (Precision, Recall, F1) if available
+    # 绘制分类指标 (Precision, Recall, F1)
     if 'test_precision' in history and len(history['test_precision']) > 0:
         plt.figure()
-        test_epochs = [history['epoch'][i] for i in range(len(history['test_precision']))]
+        # Use recorded test_epochs if available
+        test_epochs = history.get('test_epoch', [])
+        if not test_epochs or len(test_epochs) != len(history['test_precision']):
+             test_epochs = [history['epoch'][i] for i in range(len(history['test_precision']))]
+             
         plt.plot(test_epochs, history['test_precision'], label='Precision', marker='o')
         plt.plot(test_epochs, history['test_recall'], label='Recall', marker='s')
         plt.plot(test_epochs, history['test_f1'], label='F1 Score', marker='^')
@@ -225,7 +233,7 @@ def reduce_and_plot_train_test_embeddings(train_emb, train_lbl, test_emb, test_l
         test_ids: Optional list of test sequence IDs
     """
     try:
-        # Combine for reduction to ensure same space
+        # 合并数据以确保在同一空间降维
         all_emb = np.concatenate([train_emb, test_emb], axis=0)
         
         if method == 'UMAP':
@@ -237,18 +245,18 @@ def reduce_and_plot_train_test_embeddings(train_emb, train_lbl, test_emb, test_l
             
         all_emb_2d = reducer.fit_transform(all_emb)
         
-        # Split back
+        # 拆分回原数据
         n_train = len(train_emb)
         train_2d = all_emb_2d[:n_train]
         test_2d = all_emb_2d[n_train:]
         
-        # Save coordinates to CSV in separate directory
-        # Extract filename from output_path
+        # 保存坐标到 CSV
+        # 从输出路径提取文件名
         import os
         plot_filename = os.path.basename(output_path)
         csv_filename = plot_filename.replace('.png', '_coordinates.csv')
         
-        # Get the parent directory of the plots directory
+        # 获取 plots 目录的父目录
         # output_path is like: .../visualizations/plots/stage1_epoch_10.png
         # We want coords_dir to be: .../visualizations/coordinates/
         output_dir = os.path.dirname(output_path)  # .../visualizations/plots
@@ -263,13 +271,13 @@ def reduce_and_plot_train_test_embeddings(train_emb, train_lbl, test_emb, test_l
             writer = csv.writer(f)
             writer.writerow(['sequence_id', 'dataset', 'label', 'x', 'y'])
             
-            # Write train data
+            # 写入训练数据
             for i in range(len(train_2d)):
                 seq_id = train_ids[i] if train_ids else f'train_{i}'
                 label_name = 'mono' if train_lbl[i] == 0 else 'di'
                 writer.writerow([seq_id, 'train', label_name, train_2d[i, 0], train_2d[i, 1]])
             
-            # Write test data
+            # 写入测试数据
             for i in range(len(test_2d)):
                 seq_id = test_ids[i] if test_ids else f'test_{i}'
                 label_name = 'mono' if test_lbl[i] == 0 else 'di'
@@ -280,7 +288,7 @@ def reduce_and_plot_train_test_embeddings(train_emb, train_lbl, test_emb, test_l
         # Plot
         plt.figure(figsize=(12, 10))
         
-        # Plot Train (lighter, smaller)
+        # 绘制训练集 (浅色, 小点)
         unique_labels = np.unique(train_lbl)
         colors = ['lightblue', 'lightcoral'] # Lighter versions of blue/red
         class_names = ['Train Mono', 'Train Di']
@@ -297,7 +305,7 @@ def reduce_and_plot_train_test_embeddings(train_emb, train_lbl, test_emb, test_l
                 marker='o'
             )
             
-        # Plot Test (darker, larger or different marker)
+        # 绘制测试集 (深色, 大点)
         unique_labels = np.unique(test_lbl)
         colors = ['blue', 'red']
         class_names = ['Test Mono', 'Test Di']
@@ -338,7 +346,7 @@ def plot_confusion_matrix(cm, classes, output_path, title='Confusion Matrix'):
     plt.xticks(tick_marks, classes)
     plt.yticks(tick_marks, classes)
     
-    # Add text annotations
+    # 添加文本标注
     thresh = cm.max() / 2.
     for i in range(cm.shape[0]):
         for j in range(cm.shape[1]):

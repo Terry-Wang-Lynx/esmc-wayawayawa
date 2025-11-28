@@ -3,7 +3,7 @@ import torch.nn as nn
 import sys
 import os
 
-# Ensure we can import from root
+# 确保可以从根目录导入
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from pretrained import load_local_model, ESMC_600M
@@ -11,20 +11,17 @@ from pretrained import load_local_model, ESMC_600M
 class ESMCClassifier(nn.Module):
     def __init__(self, embedding_dim=1152, freeze_base=True, unfreeze_last_n=0):
         super().__init__()
-        # Load ESM-C 600M
-        # We assume the weights are available as per pretrained.py logic
+        # 加载 ESM-C 600M
         print("Loading ESM-C model...")
-        self.esmc = load_local_model(ESMC_600M, device="cpu") # Load on CPU first, move later
+        self.esmc = load_local_model(ESMC_600M, device="cpu")
         print("ESM-C model loaded.")
         
-        # Classification Head
-        # Simple 2-layer MLP
+        # 分类头: 简单的 2 层 MLP
         self.classifier = nn.Sequential(
             nn.Linear(embedding_dim, 512),
-            nn.LayerNorm(512), # Add normalization for stability
+            nn.LayerNorm(512),
             nn.ReLU(),
-            # nn.Dropout(0.1), # Remove dropout to allow overfitting on small data
-            nn.Linear(512, 2) # 2 classes
+            nn.Linear(512, 2)  # 2 分类
         )
         
         self.freeze_base = freeze_base
@@ -32,11 +29,11 @@ class ESMCClassifier(nn.Module):
         self._setup_freezing()
         self.unfreeze_layers()
         
-        # Ensure classifier head is trainable
+        # 确保分类头可训练
         for param in self.classifier.parameters():
             param.requires_grad = True
             
-        # Print trainable parameters
+        # 打印可训练参数数量
         trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
         print(f"Trainable parameters: {trainable_params}")
 
@@ -44,42 +41,18 @@ class ESMCClassifier(nn.Module):
         if self.freeze_base:
             for param in self.esmc.parameters():
                 param.requires_grad = False
-            
-            if self.unfreeze_last_n > 0:
-                # Unfreeze last N layers
-                # We need to know the structure of ESMC. 
-                # Usually it has 'layers' or 'blocks'.
-                # Let's try to find the transformer layers.
-                # Based on pretrained.py: n_layers=36 for 600M.
-                # Assuming structure is something like model.transformer.layers...
-                # We will inspect named_parameters to be safe or just iterate children.
-                # For now, let's try a heuristic: unfreeze parameters that contain "layer.XX" 
-                # where XX is in the last N indices.
-                
-                # A more robust way without knowing exact structure:
-                # Just unfreeze the last few parameters? No, that's risky.
-                # Let's assume standard transformer structure.
-                # If we can't find layers, we print a warning.
-                
-                # Let's try to find the main transformer module.
-                # If it's ESMC, it might be self.esmc.transformer
-                pass 
 
     def unfreeze_layers(self):
-        # Actual implementation of unfreezing
+        """解冻 ESMC 最后 N 层"""
         if not self.freeze_base:
             return
 
         if self.unfreeze_last_n > 0:
-            # Get all parameter names
             param_names = [n for n, _ in self.esmc.named_parameters()]
-            # Filter for layer indications. usually "layers.35." etc.
-            # Let's assume the format involves "layers.{index}"
             
-            # Find max layer index
+            # 查找最大层索引
             max_layer = -1
             import re
-            # Updated regex to match "transformer.blocks.{index}."
             layer_pattern = re.compile(r"transformer\.blocks\.(\d+)\.")
             
             for name in param_names:
@@ -102,41 +75,35 @@ class ESMCClassifier(nn.Module):
                         if layer_idx >= target_start:
                             param.requires_grad = True
                             count += 1
-                            # print(f"Unfrozen {name}")
                 print(f"Total parameters unfrozen: {count}")
             else:
                 print("Warning: Could not detect layer structure to unfreeze specific layers.")
-                # Fallback: Unfreeze everything if structure detection fails? 
-                # Or maybe unfreeze the last few parameters blindly?
-                # Let's print available parameter names to debug
                 print("Available parameter names (first 20):")
                 for n in param_names[:20]:
                     print(n)
 
     def forward_encoder(self, sequences):
         """
-        sequences: list of protein sequence strings
-        Returns: (B, D) embeddings
+        提取序列的 Embedding。
+        sequences: 蛋白质序列字符串列表
+        返回: (B, D) embeddings
         """
         device = next(self.parameters()).device
         
-        # Tokenize sequences using ESMC's internal tokenizer
-        # ESMC has a _tokenize method that takes a list of sequences
-        sequence_tokens = self.esmc._tokenize(sequences)  # Returns (B, L) tensor
+        # 使用 ESMC 内部 tokenizer
+        sequence_tokens = self.esmc._tokenize(sequences)
         sequence_tokens = sequence_tokens.to(device)
         
-        # Forward through ESMC
+        # 前向传播
         output = self.esmc(sequence_tokens=sequence_tokens)
         
-        # Extract embeddings
-        # output.embeddings is (B, L, D)
+        # 提取 embeddings (B, L, D)
         embeddings = output.embeddings
         
-        # Mean pooling over sequence length
-        # (B, L, D) -> (B, D)
+        # 平均池化 (B, L, D) -> (B, D)
         pooled = embeddings.mean(dim=1)
         
-        # Safety check: Ensure output requires grad if we are training
+        # 确保训练时需要梯度
         if self.training and not pooled.requires_grad:
              pooled.requires_grad_(True)
              
@@ -147,47 +114,21 @@ class ESMCClassifier(nn.Module):
         return self.classifier(embedding)
 
     def encode(self, sequence_list):
-        # Helper to tokenize and encode
-        # We need the tokenizer.
-        # self.esmc.tokenizer
-        
-        # This is tricky without seeing ESMC code.
-        # I'll assume I can use the tokenizer attached to the model.
-        
+        """
+        辅助函数: tokenize 并编码序列。
+        (预留接口，当前未完全实现)
+        """
         device = next(self.parameters()).device
         
-        # Tokenization logic
-        # If self.esmc has a tokenizer
         if hasattr(self.esmc, 'tokenizer'):
-            # This is likely an EsmTokenizer object
-            # It might have batch_encode_plus
             encoded = self.esmc.tokenizer.batch_encode_plus(sequence_list, padding=True, return_tensors="pt")
             input_ids = encoded['input_ids'].to(device)
-            # attention_mask = encoded['attention_mask'].to(device)
             
-            # Pass to model
-            # We might need to pass attention_mask too
-            # But forward_encoder above didn't take it.
-            # Let's update forward_encoder to take input_ids and mask
+            output = self.esmc(input_ids)
             
-            # For now, let's just return the embeddings from this method directly
-            # to avoid signature mismatch in forward_encoder
-            
-            output = self.esmc(input_ids) # Maybe accepts mask?
-            
-            # Handle output...
             if hasattr(output, 'embeddings'):
                 embeddings = output.embeddings
             else:
-                embeddings = output # Assume tensor
+                embeddings = output
             
-            # Mean pool with mask
-            # mask is (B, L)
-            # embeddings is (B, L, D)
-            # mask expanded: (B, L, 1)
-            # sum(emb * mask) / sum(mask)
-            
-            # But wait, I don't know if batch_encode_plus exists.
-            pass
-            
-        return None # Placeholder
+        return None  # 占位符

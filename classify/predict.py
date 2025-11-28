@@ -18,10 +18,10 @@ def predict(input_fasta, output_dir=None):
     device = config.STAGE2_DEVICE
     print(f"[Predict] Using device: {device}")
     
-    # Load Model
+    # 加载模型
     classifier = model.ESMCClassifier(
         embedding_dim=config.EMBEDDING_DIM,
-        freeze_base=True # Inference only
+        freeze_base=True # 仅推理
     ).to(device)
     
     model_path = config.PREDICT_MODEL_PATH
@@ -33,7 +33,7 @@ def predict(input_fasta, output_dir=None):
     utils.load_checkpoint(classifier, None, model_path)
     classifier.eval()
     
-    # Load Data
+    # 加载数据
     print(f"[Predict] Loading sequences from {input_fasta}...")
     if not os.path.exists(input_fasta):
         print(f"[Predict] Error: Input FASTA file not found.")
@@ -47,29 +47,29 @@ def predict(input_fasta, output_dir=None):
     seq_list = [s[1] for s in sequences]
     headers = [s[0] for s in sequences]
     
-    # Truncate sequences to prevent OOM errors
+    # 截断序列以防止 OOM
     max_length = 1024
     original_lengths = [len(seq) for seq in seq_list]
     seq_list = [seq[:max_length] for seq in seq_list]
     
-    # Report truncations
+    # 报告截断情况
     truncated_count = sum(1 for orig_len in original_lengths if orig_len > max_length)
     if truncated_count > 0:
         print(f"\n[Predict] Truncated {truncated_count} sequences to {max_length} residues to prevent OOM errors.")
         max_orig_len = max(original_lengths)
         print(f"[Predict] Longest original sequence: {max_orig_len} residues")
     
-    # Setup output directory
+    # 设置输出目录
     if output_dir is None:
         output_dir = config.OUTPUT_DIR
     os.makedirs(output_dir, exist_ok=True)
     
-    # Output files
+    # 输出文件
     output_file = os.path.join(output_dir, "predictions_output.csv")
     class1_file = os.path.join(output_dir, "predictions_output_class1.csv")
     class1_fasta_file = os.path.join(output_dir, "predictions_output_class1.fasta")
     
-    # Predict
+    # 预测
     print("[Predict] Running inference...")
     results = []
     class1_results = []
@@ -79,12 +79,12 @@ def predict(input_fasta, output_dir=None):
     total_seqs = len(seq_list)
     processed_seqs = 0
     
-    # Open output files
+    # 打开输出文件
     with open(output_file, 'w') as f, \
          open(class1_file, 'w') as class1_f, \
          open(class1_fasta_file, 'w') as class1_fasta_f:
         
-        # Write headers
+        # 写入表头
         f.write("sequence_name,predicted_class,prob_class_0,prob_class_1\n")
         class1_f.write("prob_class_1,sequence,predicted_class,sequence_name,prob_class_0\n")
         
@@ -93,17 +93,17 @@ def predict(input_fasta, output_dir=None):
                 batch_seqs = seq_list[i:i+batch_size]
                 batch_headers = headers[i:i+batch_size]
                 
-                # Get embeddings and logits
+                # 获取 embeddings 和 logits
                 batch_emb = classifier.forward_encoder(batch_seqs)
                 outputs = classifier.classifier(batch_emb)
                 
                 probabilities = F.softmax(outputs, dim=1)
                 predictions = torch.argmax(probabilities, dim=1)
                 
-                # Store embeddings for visualization
+                # 存储 embeddings 用于可视化
                 embeddings_list.append(batch_emb.cpu().numpy())
                 
-                # Process results
+                # 处理结果
                 for j in range(len(batch_seqs)):
                     name = batch_headers[j]
                     seq = batch_seqs[j]
@@ -117,17 +117,17 @@ def predict(input_fasta, output_dir=None):
                     }
                     results.append(res)
                     
-                    # Write to main CSV
+                    # 写入主 CSV
                     f.write(
                         f"{res['name']},{res['predicted_class']},"
                         f"{res['prob_class_0']:.6f},{res['prob_class_1']:.6f}\n"
                     )
                     
-                    # If predicted as class 1, write to class1 files
+                    # 如果预测为类别 1，写入 class1 文件
                     if res['predicted_class'] == 1:
                         class1_results.append(res)
                         
-                        # Class 1 CSV
+                        # 类别 1 CSV
                         class1_f.write(
                             f"{res['prob_class_1']:.6f},"
                             f"{res['sequence']},"
@@ -136,7 +136,7 @@ def predict(input_fasta, output_dir=None):
                             f"{res['prob_class_0']:.6f}\n"
                         )
                         
-                        # Class 1 FASTA
+                        # 类别 1 FASTA
                         class1_fasta_f.write(
                             f">{res['name']}\n{res['sequence']}\n"
                         )
@@ -145,7 +145,7 @@ def predict(input_fasta, output_dir=None):
                 progress_ratio = processed_seqs / total_seqs if total_seqs > 0 else 0
                 print(f"[Predict] Progress: {processed_seqs}/{total_seqs} ({progress_ratio*100:.2f}%)", end="\r", flush=True)
                 
-                # Flush files
+                # 刷新文件
                 f.flush()
                 os.fsync(f.fileno())
                 class1_f.flush()
@@ -153,13 +153,13 @@ def predict(input_fasta, output_dir=None):
                 class1_fasta_f.flush()
                 os.fsync(class1_fasta_f.fileno())
     
-    print()  # New line after progress
+    print()  # 进度后换行
     
-    # Display results
+    # 显示结果
     print("\n--- Prediction Results ---")
     print(f"Total sequences predicted: {len(results)}")
     
-    # Print first 20 results
+    # 打印前 20 个结果
     for res in results[:20]:
         print(f"\n> {res['name']}")
         print(f"  Predicted Class: {res['predicted_class']}")
@@ -175,21 +175,21 @@ def predict(input_fasta, output_dir=None):
     print(f"[Predict] Class 1 CSV (with sequences) saved to {class1_file}")
     print(f"[Predict] Class 1 FASTA saved to {class1_fasta_file}")
     
-    # Visualization with train/test/predict combined
+    # 可视化：训练/测试/预测组合
     print("\n[Predict] Generating embedding visualization...")
     
-    # Extract predictions for visualization
+    # 提取预测用于可视化
     all_predictions = [r['predicted_class'] for r in results]
     
-    # Get train and test embeddings
+    # 获取训练和测试 embeddings
     print("[Predict] Loading train and test sets for comparison...")
     train_seqs, train_labels, train_ids = data_loader.get_train_sequences_for_visualization(sample_size=2000)
     test_seqs, test_labels, test_ids = data_loader.get_all_sequences_for_visualization()
     
-    # Generate embeddings for train and test
+    # 生成训练和测试 embeddings
     classifier.eval()
     with torch.no_grad():
-        # Train embeddings
+        # 训练 embeddings
         train_embeddings = []
         for i in range(0, len(train_seqs), batch_size):
             batch = train_seqs[i:i+batch_size]
@@ -197,7 +197,7 @@ def predict(input_fasta, output_dir=None):
             train_embeddings.append(emb.cpu().numpy())
         train_embeddings = np.concatenate(train_embeddings, axis=0)
         
-        # Test embeddings
+        # 测试 embeddings
         test_embeddings = []
         for i in range(0, len(test_seqs), batch_size):
             batch = test_seqs[i:i+batch_size]
@@ -205,11 +205,11 @@ def predict(input_fasta, output_dir=None):
             test_embeddings.append(emb.cpu().numpy())
         test_embeddings = np.concatenate(test_embeddings, axis=0)
     
-    # Combine all embeddings for dimensionality reduction
-    all_embeddings = np.concatenate(embeddings_list, axis=0)  # Predict
+    # 合并所有 embeddings 进行降维
+    all_embeddings = np.concatenate(embeddings_list, axis=0)  # 预测
     combined_embeddings = np.concatenate([train_embeddings, test_embeddings, all_embeddings], axis=0)
     
-    # Reduce dimensions
+    # 降维
     print(f"[Predict] Reducing dimensions using {config.VISUALIZATION_METHOD}...")
     if config.VISUALIZATION_METHOD == 'UMAP':
         import umap
@@ -220,7 +220,7 @@ def predict(input_fasta, output_dir=None):
     
     combined_2d = reducer.fit_transform(combined_embeddings)
     
-    # Split back
+    # 拆分回原数据
     n_train = len(train_embeddings)
     n_test = len(test_embeddings)
     n_predict = len(all_embeddings)
@@ -229,7 +229,7 @@ def predict(input_fasta, output_dir=None):
     test_2d = combined_2d[n_train:n_train+n_test]
     predict_2d = combined_2d[n_train+n_test:]
     
-    # Save prediction coordinates to CSV
+    # 保存预测坐标到 CSV
     coords_file = os.path.join(output_dir, "prediction_coordinates.csv")
     print(f"[Predict] Saving coordinates to {coords_file}...")
     import csv
@@ -246,7 +246,7 @@ def predict(input_fasta, output_dir=None):
                 predict_2d[i, 1]
             ])
     
-    # Save class1 coordinates to separate CSV
+    # 保存类别 1 坐标到单独 CSV
     class1_coords_file = os.path.join(output_dir, "prediction_class1_coordinates.csv")
     print(f"[Predict] Saving class1 coordinates to {class1_coords_file}...")
     with open(class1_coords_file, 'w', newline='') as f:
@@ -263,7 +263,7 @@ def predict(input_fasta, output_dir=None):
                     predict_2d[i, 1]
                 ])
     
-    # Plot combined visualization
+    # 绘制组合可视化
     vis_path = os.path.join(output_dir, "prediction_vis.png")
     print(f"[Predict] Generating combined visualization...")
     
@@ -272,13 +272,13 @@ def predict(input_fasta, output_dir=None):
     
     # Plot in order: Predictions (background) -> Train (middle) -> Test (foreground)
     
-    # 1. Plot Predictions first (background, semi-transparent)
+    # 1. 预测点 (背景, 空心, 低透明度)
     predict_mono_mask = np.array(all_predictions) == 0
     predict_di_mask = np.array(all_predictions) == 1
     plt.scatter(predict_2d[predict_mono_mask, 0], predict_2d[predict_mono_mask, 1],
-                c='lightgreen', label='Predict Mono', alpha=0.4, s=30, marker='o', edgecolors='green', linewidths=0.5)
+                facecolors='none', edgecolors='green', label='Predict Mono', alpha=0.3, s=20, marker='o', linewidths=0.8)
     plt.scatter(predict_2d[predict_di_mask, 0], predict_2d[predict_di_mask, 1],
-                c='lightsalmon', label='Predict Di', alpha=0.4, s=30, marker='o', edgecolors='orange', linewidths=0.5)
+                facecolors='none', edgecolors='orange', label='Predict Di', alpha=0.3, s=20, marker='o', linewidths=0.8)
     
     # 2. Plot Train (middle layer, more visible)
     train_mono_mask = np.array(train_labels) == 0
@@ -305,7 +305,7 @@ def predict(input_fasta, output_dir=None):
     
     print(f"[Predict] Visualization saved to {vis_path}")
     
-    # Generate cluster boundary visualization
+    # 生成聚类边界可视化
     boundary_vis_path = os.path.join(output_dir, "prediction_vis_with_boundaries.png")
     print(f"[Predict] Generating cluster boundary visualization...")
     
@@ -314,11 +314,11 @@ def predict(input_fasta, output_dir=None):
     
     plt.figure(figsize=(14, 12))
     
-    # Combine train and test for each class
+    # 合并训练和测试数据
     train_test_mono_2d = np.vstack([train_2d[train_mono_mask], test_2d[test_mono_mask]])
     train_test_di_2d = np.vstack([train_2d[train_di_mask], test_2d[test_di_mask]])
     
-    # Function to draw convex hulls for clusters
+    # 绘制聚类凸包函数
     def draw_cluster_hulls(points, color, label_prefix, min_cluster_size=5):
         """Use DBSCAN to find clusters and draw convex hulls"""
         if len(points) < 3:
@@ -338,16 +338,16 @@ def predict(input_fasta, output_dir=None):
             if len(cluster_points) >= 3:
                 try:
                     hull = ConvexHull(cluster_points)
-                    # Draw hull
+                    # 绘制凸包
                     for simplex in hull.simplices:
                         plt.plot(cluster_points[simplex, 0], cluster_points[simplex, 1], 
                                 color=color, linewidth=2, alpha=0.8)
-                    # Fill hull
+                    # 填充凸包
                     hull_points = cluster_points[hull.vertices]
                     plt.fill(hull_points[:, 0], hull_points[:, 1], 
                             color=color, alpha=0.15, label=f'{label_prefix} Cluster {cluster_id+1}' if cluster_id == 0 else '')
                     
-                    # Store bounds for zoomed views
+                    # 存储边界用于放大视图
                     x_min, x_max = cluster_points[:, 0].min(), cluster_points[:, 0].max()
                     y_min, y_max = cluster_points[:, 1].min(), cluster_points[:, 1].max()
                     cluster_bounds.append((x_min, x_max, y_min, y_max))
@@ -356,18 +356,18 @@ def predict(input_fasta, output_dir=None):
         
         return cluster_bounds
     
-    # Draw cluster boundaries and get bounds
+    # 绘制聚类边界并获取范围
     mono_bounds = draw_cluster_hulls(train_test_mono_2d, 'blue', 'Mono')
     di_bounds = draw_cluster_hulls(train_test_di_2d, 'red', 'Di')
     
     # Plot in order: Predictions (background) -> Train (middle) -> Test (foreground)
     # Same as main vis plot
     
-    # 1. Plot Predictions first (background, semi-transparent)
+    # 1. 预测点 (背景, 空心, 低透明度)
     plt.scatter(predict_2d[predict_mono_mask, 0], predict_2d[predict_mono_mask, 1],
-                c='lightgreen', label='Predict Mono', alpha=0.4, s=30, marker='o', edgecolors='green', linewidths=0.5)
+                facecolors='none', edgecolors='green', label='Predict Mono', alpha=0.3, s=20, marker='o', linewidths=0.8)
     plt.scatter(predict_2d[predict_di_mask, 0], predict_2d[predict_di_mask, 1],
-                c='lightsalmon', label='Predict Di', alpha=0.4, s=30, marker='o', edgecolors='orange', linewidths=0.5)
+                facecolors='none', edgecolors='orange', label='Predict Di', alpha=0.3, s=20, marker='o', linewidths=0.8)
     
     # 2. Plot Train (middle layer, more visible)
     plt.scatter(train_2d[train_mono_mask, 0], train_2d[train_mono_mask, 1],
@@ -455,11 +455,7 @@ def predict(input_fasta, output_dir=None):
                     plt.scatter(x, y, c='orange', s=100, marker='^', 
                                edgecolors='darkorange', linewidths=1.5, zorder=10, label=label)
                     di_label_added = True
-                
-                # Add sequence name annotation
-                plt.annotate(results[i]['name'], (x, y), 
-                           xytext=(5, 5), textcoords='offset points',
-                           fontsize=8, alpha=0.7)
+
         
         plt.xlim(x_min, x_max)
         plt.ylim(y_min, y_max)
@@ -558,11 +554,7 @@ def predict(input_fasta, output_dir=None):
                     plt.scatter(x, y, c='orange', s=100, marker='^', 
                                edgecolors='darkorange', linewidths=1.5, zorder=10, label=label)
                     di_label_added = True
-                
-                # Add sequence name annotation
-                plt.annotate(results[i]['name'], (x, y), 
-                           xytext=(5, 5), textcoords='offset points',
-                           fontsize=8, alpha=0.7)
+
         
         plt.xlim(x_min, x_max)
         plt.ylim(y_min, y_max)

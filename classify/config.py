@@ -1,14 +1,14 @@
 import os
 
-# --- Paths ---
+# --- 路径配置 ---
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
-DATA_ROOT = os.path.join(os.path.dirname(PROJECT_ROOT), "data") # Assuming data is in root/data, or adjust as needed. 
-# Based on requirements, data is now in classify/data
+DATA_ROOT = os.path.join(os.path.dirname(PROJECT_ROOT), "data")
+# 数据实际在 classify/data 目录
 DATA_ROOT = os.path.join(PROJECT_ROOT, "data") 
 
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
-# --- Stage 1 Configuration ---
+# --- Stage 1 配置 ---
 STAGE1_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "stage1")
 STAGE1_LOG_DIR = os.path.join(STAGE1_OUTPUT_DIR, "logs")
 STAGE1_CHECKPOINT_DIR = os.path.join(STAGE1_OUTPUT_DIR, "checkpoints")
@@ -16,88 +16,83 @@ STAGE1_VISUALIZATION_DIR = os.path.join(STAGE1_OUTPUT_DIR, "visualizations")
 STAGE1_VISUALIZATION_PLOTS_DIR = os.path.join(STAGE1_VISUALIZATION_DIR, "plots")
 STAGE1_VISUALIZATION_COORDS_DIR = os.path.join(STAGE1_VISUALIZATION_DIR, "coordinates")
 
-# --- Stage 2 Configuration ---
+# --- Stage 2 配置 ---
 STAGE2_OUTPUT_DIR = os.path.join(OUTPUT_DIR, "stage2")
 STAGE2_LOG_DIR = os.path.join(STAGE2_OUTPUT_DIR, "logs")
 STAGE2_CHECKPOINT_DIR = os.path.join(STAGE2_OUTPUT_DIR, "checkpoints")
 STAGE2_VISUALIZATION_DIR = os.path.join(STAGE2_OUTPUT_DIR, "visualizations")
 
-# Deprecated global paths (kept for compatibility if needed, but should be avoided)
+# 废弃的全局路径 (保留以兼容旧代码)
 LOG_DIR = STAGE1_LOG_DIR 
 CHECKPOINT_DIR = STAGE1_CHECKPOINT_DIR
 VISUALIZATION_DIR = STAGE1_VISUALIZATION_DIR
 VISUALIZATION_PLOTS_DIR = STAGE1_VISUALIZATION_PLOTS_DIR
 VISUALIZATION_COORDS_DIR = STAGE1_VISUALIZATION_COORDS_DIR
 
-# --- Data Files ---
+# --- 数据文件 ---
 TRAIN_MONO_FILE = "train_mono.fasta"
 TRAIN_DI_FILE = "train_di.fasta"
 TEST_MONO_FILE = "test_mono.fasta"
 TEST_DI_FILE = "test_di.fasta"
 
-# --- Model Configuration ---
-ESMC_MODEL_NAME = "esmc_600m" # Adjust based on actual model loading string if needed
-EMBEDDING_DIM = 1152 # ESM-C 600M has d_model=1152
+# --- 模型配置 ---
+ESMC_MODEL_NAME = "esmc_600m"
+EMBEDDING_DIM = 1152  # ESM-C 600M 的 d_model 维度
 
-# --- Device Configuration ---
+# --- 设备配置 ---
 import torch
-# Default device
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-# Stage specific devices (can be overridden)
-# You can set these to "cuda:0", "cuda:1", etc.
-STAGE1_DEVICE = "cuda:2" 
+# Stage 专用设备 (可设为 "cuda:0", "cuda:1" 等)
+STAGE1_DEVICE = "cuda:1" 
 STAGE2_DEVICE = "cuda:3"
 
-# --- Stage 1: Contrastive Pretraining ---
+# --- Stage 1: 对比预训练 ---
 STAGE1_EPOCHS = 10000
 STAGE1_BATCH_SIZE = 16 
 STAGE1_LEARNING_RATE = 1e-5
 LOG_INTERVAL_STEPS = 50
-SAVE_CHECKPOINT_INTERVAL = 500
-RESUME_FROM_CHECKPOINT = None # Path to checkpoint if resuming, e.g., os.path.join(CHECKPOINT_DIR, "stage1_epoch_5.pth")
+SAVE_CHECKPOINT_INTERVAL = 250
+RESUME_FROM_CHECKPOINT = None  # 恢复训练的检查点路径
+STAGE1_FULL_FINETUNE = False  # 是否解冻所有层进行全量微调
 
-# --- Stage 2: Classification Finetuning ---
+# --- Stage 2: 分类微调 ---
 STAGE2_EPOCHS = 10000
-STAGE2_BATCH_SIZE = 32 # Full batch for stability (total samples ~28)
-STAGE2_LEARNING_RATE = 2e-5 # Increased from 1e-5
+STAGE2_BATCH_SIZE = 32  # 全批次 (总样本约 28 条)
+STAGE2_LEARNING_RATE = 5e-6
 FREEZE_BASE_MODEL = True
-UNFREEZE_LAST_N_LAYERS = 0 # Increased from 4 to 6
+UNFREEZE_LAST_N_LAYERS = 0
 
-# --- Data Augmentation ---
-AUGMENT_PROB = 0      # Reduced from 0.5
+# --- 数据增强 ---
+AUGMENT_PROB = 0
 MASK_PROB = 0       
-MUTATION_PROB = 0    # Reduced from 0.05
+MUTATION_PROB = 0
 
-# Stage 2 Pretrained Weights
-# Set to None to skip loading Stage 1 weights, or specify a custom path
-STAGE2_PRETRAINED_WEIGHTS = "/home/wangty/esm/esm/classify/output/stage1_20251125_10000_final_1/checkpoints/stage1_epoch_8500.pth"
-# Examples:
-# STAGE2_PRETRAINED_WEIGHTS = os.path.join(STAGE1_CHECKPOINT_DIR, "stage1_epoch_100.pth")
-# STAGE2_PRETRAINED_WEIGHTS = "/absolute/path/to/custom_weights.pth"
-# STAGE2_PRETRAINED_WEIGHTS = None  # Train from scratch
+# Stage 2 预训练权重路径
+# 设为 None 跳过加载 Stage 1 权重，或指定自定义路径
+STAGE2_PRETRAINED_WEIGHTS = "/home/wangty/esm/esm/classify/output/stage1_20251128_final/checkpoints/stage1_epoch_1000.pth"
 
-# Stage 2 Checkpoint Saving
-STAGE2_SAVE_CHECKPOINT_INTERVAL = 25  # Save checkpoint every N epochs
+# Stage 2 检查点保存间隔
+STAGE2_SAVE_CHECKPOINT_INTERVAL = 25
 
-# --- Visualization & Evaluation ---
-# Stage 1 specific
-STAGE1_VISUALIZATION_INTERVAL = 10  # How often to generate UMAP/t-SNE plots
-STAGE1_SAVE_PLOTS_INTERVAL = 1      # How often to save training curves
+# --- 可视化与评估 ---
+# Stage 1
+STAGE1_VISUALIZATION_INTERVAL = 10  # 可视化生成间隔
+STAGE1_SAVE_PLOTS_INTERVAL = 1      # 训练曲线保存间隔
 
-# Stage 2 specific
-STAGE2_VISUALIZATION_INTERVAL = 10  # How often to generate UMAP/t-SNE plots
-STAGE2_EVAL_INTERVAL = 10            # How often to evaluate on test set
-STAGE2_SAVE_PLOTS_INTERVAL = 1      # How often to save training curves
+# Stage 2
+STAGE2_VISUALIZATION_INTERVAL = 10  # 可视化生成间隔
+STAGE2_EVAL_INTERVAL = 10           # 测试集评估间隔
+STAGE2_SAVE_PLOTS_INTERVAL = 1      # 训练曲线保存间隔
 
-# Deprecated (kept for compatibility)
+# 废弃 (保留兼容性)
 VISUALIZATION_EPOCH_INTERVAL = STAGE1_VISUALIZATION_INTERVAL
 EVAL_EPOCH_INTERVAL = STAGE2_EVAL_INTERVAL
 
-VISUALIZATION_METHOD = "UMAP" # or "t-SNE"
+VISUALIZATION_METHOD = "UMAP"  # 或 "t-SNE"
 
-# --- Prediction Configuration ---
-# Path to the model weights for prediction
-PREDICT_MODEL_PATH = "/home/wangty/esm/esm/classify/output/stage2_20251125_1200_final_2/checkpoints/stage2_epoch_1000.pth"
-# Examples:
-# PREDICT_MODEL_PATH = os.path.join(STAGE2_CHECKPOINT_DIR, "stage2_epoch_500.pth")
-# PREDICT_MODEL_PATH = "/absolute/path/to/custom_model.pth"
+# --- 预测配置 ---
+# 预测使用的模型权重路径
+PREDICT_MODEL_PATH = "/home/wangty/esm/esm/classify/output/stage2_20251128_final/checkpoints/stage2_epoch_1200.pth"
+
+# 学习率预热比例
+WARMUP_RATIO = 0.1

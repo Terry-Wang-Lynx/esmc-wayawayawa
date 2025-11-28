@@ -30,9 +30,13 @@ venv/
 
 # 常见输出、权重目录
 weights/
+data/
 data/weights/
 checkpoints/
 outputs/
+classify/output/
+classify/data/
+discovery/outputs/
 
 # 日志文件
 *.log
